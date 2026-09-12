@@ -1,96 +1,176 @@
-# Zero Network Connectivity 📡
-
 <div align="center">
-  <h3>Offline P2P LAN & Hotspot Messenger, Voice/Video Calls & File Transfer for Android</h3>
-  <p><strong>Developed by:</strong> Md Arafath Rahman</p>
-  <p><strong>Current Version:</strong> v1.0.1 (API 36 Ready)</p>
+
+  <img src="app/src/main/res/drawable/app_logo.png" alt="Zero Network Connectivity Logo" width="120" height="120" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);" />
+
+  # Zero Network Connectivity 📡
+  
+  **A 100% Offline, Peer-to-Peer (P2P) LAN & Hotspot Messenger, High-Speed File Transfer, Real-Time Voice & Video Calls for Android.**
+
+  [![Android API](https://img.shields.io/badge/Android-API%2026%20--%2036-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
+  [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
+  [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+  [![Latest Release](https://img.shields.io/github/v/release/smartworldarafath/Zero-Internet-Connectivity?color=00B4D8&style=for-the-badge&logo=github)](https://github.com/smartworldarafath/Zero-Internet-Connectivity/releases/latest)
+  [![License](https://img.shields.io/badge/License-MIT-F77F00?style=for-the-badge)](LICENSE)
+  [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline%20%7C%20Zero%20Cloud-2A9D8F?style=for-the-badge)](#-security--privacy-first)
+
+  <br />
+
+  <p align="center">
+    <a href="https://github.com/smartworldarafath/Zero-Internet-Connectivity/releases/latest"><strong>📥 Download Latest APK (v1.0.1)</strong></a> •
+    <a href="#-key-features"><strong>Features</strong></a> •
+    <a href="#-protocol-specification"><strong>Protocol Specs</strong></a> •
+    <a href="#-architecture--tech-stack"><strong>Tech Stack</strong></a> •
+    <a href="#-getting-started"><strong>Build Guide</strong></a>
+  </p>
 </div>
 
 ---
 
-## 🌟 Overview
+## 🌟 What is Zero Network Connectivity?
 
-**Zero Network Connectivity** is a modern, high-performance, and completely offline communication application built natively for Android using **Jetpack Compose**, **Kotlin Coroutines**, and **Zero-Config P2P Networking**.
+**Zero Network Connectivity** is an advanced, decentralized communication suite built natively for Android. It enables seamless communication and data transfer between Android devices without requiring:
+- ❌ No Internet connection
+- ❌ No Mobile data / SIM card
+- ❌ No Cloud servers or third-party accounts
+- ❌ No Tracking, telemetry, or metadata logging
 
-It operates completely without internet access, cellular data, or external servers. All discovery, messaging, real-time audio/video calls, and file transfers take place directly between devices over local Wi-Fi networks or portable Wi-Fi hotspots.
+Whether you are in remote locations, during emergency blackouts, on flights, inside campus LAN networks, or simply sharing huge files at maximum Wi-Fi hardware speeds, **Zero Network Connectivity** connects you directly device-to-device.
 
 ---
 
 ## 🚀 Key Features
 
-### 📡 1. Zero-Config LAN & Hotspot Discovery
-- **Subnet Broadcast & Fast Sweep:** Auto-calculates network interface subnet addresses (`192.168.1.255`, `192.168.43.255`) combined with parallel port 1050 sweeps to find any device instantly.
-- **Connect with QR:** Generate offline QR codes with pairing credentials and scan using the built-in CameraX scanner for instant 1-tap connection.
-- **Radar Pulse Visualizer:** Animated radar showing active peers in real-time.
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                          ZERO NETWORK CONNECTIVITY v1.0.1                        │
+├───────────────────────┬─────────────────────────┬────────────────────────────────┤
+│   📡 ZERO-CONFIG P2P  │    💬 RICH MESSAGING    │    📞 ULTRA-LOW LATENCY CALLS  │
+│ • Subnet Broadcast    │ • Instant Text Delivery │ • Real-Time PCM Voice Calls    │
+│ • Fast IP Ping Sweep  │ • Telegram Voice Notes  │ • CameraX Live Video Streaming │
+│ • 1-Tap QR Connect    │ • Auto-Save to Gallery  │ • Echo & Noise Cancellation    │
+│ • Radar Pulse Radar   │ • Group LAN Chats       │ • Speaker/Mute/Cam Flipping    │
+└───────────────────────┴─────────────────────────┴────────────────────────────────┘
+```
 
-### 💬 2. Modern Telegram & Signal Inspired Messaging
-- **Instant LAN Messaging:** Sub-millisecond peer-to-peer delivery over UDP and TCP.
-- **Hold-to-Record Voice Notes:** Telegram-style hold-to-record mic button with live audio waveform visualization, elapsed timer, drag-to-cancel, and release-to-send.
-- **Full Media Sharing:** Send images, high-definition videos, audio files, and documents over LAN.
-- **Auto-Save to Gallery:** Incoming photos and videos are automatically indexed and saved to the Android MediaStore gallery (`Pictures/ZeroNetwork`, `Movies/ZeroNetwork`).
-- **Group Chats:** Create offline LAN groups for multiple connected peers.
+### 📡 1. Zero-Config Device Discovery
+- **Subnet-Wide Broadcasting:** Automatically computes active Wi-Fi interface broadcast addresses (e.g. `192.168.1.255`, `192.168.43.255`).
+- **Parallel Subnet Ping Sweep:** Rapidly probes `1..254` on Port `1050` to instantly locate peers even across restrictive access points.
+- **Connect with QR:** Generate peer credentials as an offline QR code and scan via built-in CameraX analyzer for instant pairing.
+- **Radar Pulse Visualizer:** Fluid animated radar display tracking nearby active peers.
+
+### 💬 2. Modern Telegram & Signal-Inspired Messaging
+- **Hold-to-Record Voice Notes:** Telegram-style hold-to-record mic with live waveform audio visualizer, elapsed timer, slide-left-to-cancel, and release-to-send.
+- **High-Speed Media Sharing:** Send HD Photos, 4K Videos, Audio tracks, and Documents at raw Wi-Fi throughput.
+- **Automatic Gallery Indexing:** Incoming photos and videos are automatically written to `Pictures/ZeroNetwork` and `Movies/ZeroNetwork` with immediate MediaStore gallery indexing.
+- **Offline LAN Groups:** Create local multi-party groups for decentralized broadcast messaging.
 
 ### 📞 3. Real-Time Offline Voice & Video Calls
-- **Ultra-Low Latency Audio:** Real-time PCM audio streaming with Acoustic Echo Cancellation (AEC) and Noise Suppression (NS).
-- **Live Video Streaming:** CameraX frame capture with adaptive YUV to JPEG compression streamed directly over UDP.
-- **In-Call Controls:** Mute, speakerphone toggle, camera flip (front/back), and video feed toggles.
+- **PCM Audio Streaming:** Sub-50ms latency voice streaming over UDP on Port `1052` with hardware `AcousticEchoCanceler` and `NoiseSuppressor`.
+- **Live Video Streaming:** High-framerate CameraX capture compressed via adaptive YUV-to-JPEG and transmitted over UDP on Port `1053`.
+- **Full Call Controls:** Toggle microphone mute, switch to speakerphone, flip cameras, or disable video feeds on the fly.
 
 ### ⚙️ 4. Diagnostics & Deep Customization
-- **Full-Width 3-Line Sliding Drawer:** Clean navigation separating Chat, Appearance, Connections, Updates, and About.
-- **Network Diagnostics:** Live Hardware MAC address, Wi-Fi link speed (Mbps), frequency band (2.4/5/6 GHz), subnet mask, gateway, and LAN ping latency tester.
-- **Chat Customization:** Adjustable bubble corner radius slider (4dp - 28dp), custom bubble preset styles, chat wallpapers (Classic, Doodles, Gradient), and font scale multiplier.
-- **Profile Management:** Add, update, or remove profile pictures using Camera capture or Gallery picker.
-- **GitHub Updates Engine:** Automatic check against GitHub Releases (`v1.0.1+`) with animated home alerts and direct in-app APK installer.
+- **Full-Width Sliding Drawer:** Clean 3-line hamburger menu that slides away upon tab selection to grant 100% screen space.
+- **Network Diagnostics:** Real Hardware MAC address, Wi-Fi link speed in Mbps, frequency band (2.4 / 5 / 6 GHz), gateway, open ports, and live LAN ping latency tester.
+- **Chat Customization:** Adjustable bubble corner radius slider (4dp - 28dp), preset styles (Telegram, Signal, Modern, Minimal), dark wallpapers, and font size scaling.
+- **Profile Picture Manager:** Add, change, or remove avatars using Camera capture or Gallery picker.
+- **GitHub Updater:** Automatic check against GitHub Releases API with 2-second home screen alerts and in-app APK installer.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 📡 Protocol Specification
+
+Zero Network Connectivity uses a lightweight, multi-port protocol designed for high efficiency and low battery consumption:
+
+| Port | Transport | Function | Description |
+| :--- | :--- | :--- | :--- |
+| **`1050`** | **UDP** | **Discovery & Signals** | Periodic heartbeats, subnet broadcast, ping sweep, typing events, and call signaling packets. |
+| **`1051`** | **TCP** | **File & Media Transfer** | Multi-threaded binary file transmission stream with chunks, checksums, and progress tracking. |
+| **`1052`** | **UDP** | **Voice Calling** | Real-time 16kHz 16-bit PCM voice streaming with echo cancellation. |
+| **`1053`** | **UDP** | **Video Calling** | Compressed JPEG camera frames streamed directly peer-to-peer. |
+
+---
+
+## 🛡️ Security & Privacy First
+
+```mermaid
+flowchart LR
+    A[📱 Device A] <=== Direct Encrypted LAN Socket ===> B[📱 Device B]
+    A -.x No Cloud Servers x.- C[☁️ External Internet]
+    B -.x No Cloud Servers x.- C
+```
+
+- **Zero Cloud Dependence:** No servers, no authentication gateways, and no centralized databases.
+- **Local Storage Only:** All messages, conversations, and avatars are stored in an encrypted local Room SQLite database on your device.
+- **Air-Gapped Ready:** Works flawlessly in airplane mode with Wi-Fi / Hotspot turned on.
+
+---
+
+## 🛠️ Architecture & Tech Stack
+
+```
+com.zeronetwork.connectivity/
+├── data/
+│   ├── local/          # Room DB (AppDatabase, MessageDao, ConversationDao, PeerDao)
+│   ├── model/          # Data Models (ChatMessage, Peer, CallSession, NetworkStats)
+│   └── repository/     # ChatRepository, PeerRepository
+├── network/            # P2P Engine (LanDiscovery, LanFileTransfer, LanCallEngine, NetworkMonitor)
+├── ui/
+│   ├── components/     # SpringBubble, RadarPulse, VoiceRecorder, QrDialog, BottomDock
+│   ├── screens/        # ChatsTab, FindOthersScreen, CallScreens, SettingsScreen, ProfileScreen
+│   ├── theme/          # Material 3 Color Schemes, Typography, Shapes
+│   └── viewmodel/      # MainViewModel, ChatViewModel, CallViewModel, SettingsViewModel
+└── MainActivity.kt     # Root Activity with Edge-to-Edge and Navigation Controller
+```
 
 - **Language:** Kotlin 2.0.21
 - **UI Framework:** Jetpack Compose (Material 3)
-- **Architecture:** MVVM + Clean Repository Pattern + Kotlin Flow
-- **Local Persistence:** Room Database (2.6.1) + SharedPreferences
-- **Camera & Barcode Scanning:** CameraX 1.4.1 + ZXing Core 3.5.3
-- **Image Loading:** Coil Compose
-- **Networking Protocol:**
-  - **Discovery & Heartbeat:** UDP Broadcast on Port `1050`
-  - **Direct Text & Commands:** UDP / Direct Datagram on Port `1050`
-  - **High-Speed File Transfer:** Multi-threaded TCP Server on Port `1051`
-  - **Real-Time Voice Streaming:** UDP on Port `1052`
-  - **Real-Time Video Streaming:** UDP on Port `1053`
+- **Local Database:** Room 2.6.1 + KSP
+- **Camera & Barcodes:** CameraX 1.4.1 + ZXing Core 3.5.3
+- **Image Pipeline:** Coil Compose 2.7.0
+- **Target OS:** Android 16 (API 36) • Min SDK: Android 8.0 (API 26)
 
 ---
 
-## 📥 Getting Started & Building from Source
+## 📥 Getting Started & Installation
 
-### Prerequisites
-- Android Studio Ladybug | 2024.2.1+ or newer
-- Android SDK 36
-- Java Development Kit (JDK) 21
+### Option 1: Download Pre-Built Release APK
+Download the latest verified APK directly from the releases page:
+👉 **[Download ZeroNetworkConnectivity-v1.0.1.apk](https://github.com/smartworldarafath/Zero-Internet-Connectivity/releases/latest)**
 
-### Build Instructions
+### Option 2: Build from Source
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/smartworldarafath/Zero-Internet-Connectivity.git
 
-# Navigate to project root
+# 2. Open directory
 cd Zero-Internet-Connectivity
 
-# Build debug APK
+# 3. Build debug APK
 ./gradlew assembleDebug
 
-# Build release APK
+# 4. Build optimized release APK
 ./gradlew assembleRelease
 ```
 
 ---
 
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+---
+
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
-  Crafted with ❤️ by <strong>Md Arafath Rahman</strong>
+  <p>Crafted with ❤️ by <strong>Md Arafath Rahman</strong></p>
+  <p>
+    <a href="https://github.com/smartworldarafath">GitHub</a> •
+    <a href="mailto:smartworld.bd.710@gmail.com">Contact</a>
+  </p>
 </div>
