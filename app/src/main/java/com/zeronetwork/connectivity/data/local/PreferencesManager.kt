@@ -2,6 +2,7 @@ package com.zeronetwork.connectivity.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import com.zeronetwork.connectivity.data.model.UserProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,11 +16,11 @@ class PreferencesManager(context: Context) {
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
 
     private fun loadProfile(): UserProfile {
-        val defaultName = android.os.Build.MODEL.ifEmpty { "Android Device" }
+        val defaultName = Build.MODEL?.takeIf { it.isNotBlank() } ?: "Android Device"
         return UserProfile(
             username = prefs.getString("username", defaultName) ?: defaultName,
-            phoneNumber = prefs.getString("phoneNumber", "+1 555-0199") ?: "+1 555-0199",
-            email = prefs.getString("email", "user@zeronetwork.lan") ?: "user@zeronetwork.lan",
+            phoneNumber = prefs.getString("phoneNumber", "") ?: "",
+            email = prefs.getString("email", "") ?: "",
             avatarUri = prefs.getString("avatarUri", null),
             avatarColorIndex = prefs.getInt("avatarColorIndex", 0),
             storageMode = prefs.getString("storageMode", "LOCAL") ?: "LOCAL",

@@ -1,11 +1,10 @@
 package com.zeronetwork.connectivity.network
 
 import com.google.gson.Gson
-import com.zeronetwork.connectivity.data.model.MessageType
 import java.nio.charset.StandardCharsets
 
 data class RichPacket(
-    val type: String, // "TYPING", "CALL_INVITE", "CALL_ACCEPT", "CALL_REJECT", "CALL_HANGUP", "GROUP_MSG", "FILE_META"
+    val type: String, // "TYPING", "CALL_INVITE", "CALL_ACCEPT", "CALL_REJECT", "CALL_HANGUP", "PEER_PROBE", "GROUP_UPDATE", "AVATAR_UPDATE"
     val senderId: String,
     val senderName: String,
     val senderIp: String = "",
@@ -18,6 +17,9 @@ data class RichPacket(
     val fileName: String? = null,
     val fileSize: Long = 0L,
     val filePort: Int = NetworkConstants.TCP_FILE_PORT,
+    val avatarBase64: String? = null,
+    val groupTitle: String? = null,
+    val memberIps: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 

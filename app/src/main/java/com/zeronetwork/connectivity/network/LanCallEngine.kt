@@ -14,7 +14,9 @@ import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
+import android.os.Build
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.zeronetwork.connectivity.data.model.CallSession
@@ -34,7 +36,6 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.nio.ByteBuffer
 
 class LanCallEngine(private val context: Context, private val discoveryService: LanDiscoveryService) {
     private val TAG = "LanCallEngine"
@@ -46,18 +47,19 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
     private val _remoteVideoBitmap = MutableStateFlow<Bitmap?>(null)
     val remoteVideoBitmap: StateFlow<Bitmap?> = _remoteVideoBitmap.asStateFlow()
 
-    // Audio components
-    private val sampleRate = 16000
+    // High fidelity 44.1kHz voice audio
+    private val sampleRate = 44100
     private val channelConfigIn = AudioFormat.CHANNEL_IN_MONO
     private val channelConfigOut = AudioFormat.CHANNEL_OUT_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-    private val bufferSizeAudioIn = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat).coerceAtLeast(1024)
-    private val bufferSizeAudioOut = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat).coerceAtLeast(1024)
+    private val bufferSizeAudioIn = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat).coerceAtLeast(2048)
+    private val bufferSizeAudioOut = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat).coerceAtLeast(2048)
 
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
     private var echoCanceler: AcousticEchoCanceler? = null
     private var noiseSuppressor: NoiseSuppressor? = null
+    private var gainControl: AutomaticGainControl? = null
 
     private var audioSocket: DatagramSocket? = null
     private var videoSocket: DatagramSocket? = null
@@ -68,7 +70,6 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
     private var timerJob: Job? = null
 
     init {
-        // Listen to call signals from discovery service
         scope.launch {
             discoveryService.events.collect { event ->
                 if (event is LanEvent.CallSignal) {
@@ -83,7 +84,6 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
             "CALL_INVITE" -> {
                 val current = _callSession.value
                 if (current != null && current.state == CallState.CONNECTED) {
-                    // Busy
                     discoveryService.sendCallSignal(
                         signal.senderIp,
                         RichPacket(
@@ -231,14 +231,12 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
     @SuppressLint("MissingPermission")
     private fun startCallStreaming(peerIp: String, isVideo: Boolean) {
         try {
-            // Audio Sockets & Engine
             audioSocket?.close()
             audioSocket = DatagramSocket(null).apply {
                 reuseAddress = true
                 bind(InetSocketAddress(NetworkConstants.VOICE_CALL_PORT))
             }
 
-            // Audio Record setup
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 sampleRate,
@@ -247,18 +245,23 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                 bufferSizeAudioIn
             )
 
-            if (AcousticEchoCanceler.isAvailable()) {
-                echoCanceler = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)?.apply {
-                    enabled = true
+            val sessionId = audioRecord?.audioSessionId ?: 0
+            if (sessionId != 0) {
+                if (AcousticEchoCanceler.isAvailable()) {
+                    echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
                 }
-            }
-            if (NoiseSuppressor.isAvailable()) {
-                noiseSuppressor = NoiseSuppressor.create(audioRecord!!.audioSessionId)?.apply {
-                    enabled = true
+                if (NoiseSuppressor.isAvailable()) {
+                    noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
+                }
+                if (AutomaticGainControl.isAvailable()) {
+                    gainControl = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
                 }
             }
 
-            // Audio Track setup
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager?.isSpeakerphoneOn = isVideo
+
             audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
@@ -280,10 +283,10 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
             audioRecord?.startRecording()
             audioTrack?.play()
 
-            // Audio send loop
+            // Audio transmission
             audioRecordJob = scope.launch {
                 val targetAddr = InetAddress.getByName(peerIp)
-                val buffer = ByteArray(bufferSizeAudioIn)
+                val buffer = ByteArray(1024)
                 while (isActive) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: -1
                     if (read > 0) {
@@ -296,9 +299,9 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                 }
             }
 
-            // Audio receive loop
+            // Audio reception
             audioPlayJob = scope.launch {
-                val buffer = ByteArray(4096)
+                val buffer = ByteArray(2048)
                 while (isActive) {
                     try {
                         val packet = DatagramPacket(buffer, buffer.size)
@@ -307,12 +310,12 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                             audioTrack?.write(packet.data, 0, packet.length)
                         }
                     } catch (e: Exception) {
-                        if (isActive) delay(50)
+                        if (isActive) delay(20)
                     }
                 }
             }
 
-            // Video Engine
+            // Video reception
             if (isVideo) {
                 videoSocket?.close()
                 videoSocket = DatagramSocket(null).apply {
@@ -333,7 +336,7 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                                 }
                             }
                         } catch (e: Exception) {
-                            if (isActive) delay(50)
+                            if (isActive) delay(20)
                         }
                     }
                 }
@@ -362,7 +365,6 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                     videoSocket?.send(packet)
                 }
             } catch (e: Exception) {
-                // Ignore dropped frames
             } finally {
                 imageProxy.close()
             }
@@ -386,7 +388,7 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
 
         val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
         val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 40, out)
+        yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 45, out)
         return out.toByteArray()
     }
 
@@ -420,6 +422,11 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
         videoReceiveJob?.cancel()
 
         try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioManager?.mode = AudioManager.MODE_NORMAL
+        } catch (e: Exception) {}
+
+        try {
             audioRecord?.stop()
             audioRecord?.release()
         } catch (e: Exception) {}
@@ -434,6 +441,7 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
         try {
             echoCanceler?.release()
             noiseSuppressor?.release()
+            gainControl?.release()
         } catch (e: Exception) {}
 
         try {

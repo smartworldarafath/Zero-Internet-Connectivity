@@ -39,9 +39,9 @@ class ChatRepository(
     private val TAG = "ChatRepository"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val conversations: Flow<List<ChatConversation>> = conversationDao.getAllConversations()
+    val conversations: Flow<List<ChatConversation>> = conversationDao.getActiveConversations()
+    val archivedConversations: Flow<List<ChatConversation>> = conversationDao.getArchivedConversations()
 
-    // Voice note recorder
     private var mediaRecorder: MediaRecorder? = null
     private var currentRecordingFile: File? = null
     private var recordingStartTime: Long = 0L
@@ -49,10 +49,34 @@ class ChatRepository(
     init {
         listenToIncomingMessages()
         listenToFileTransfers()
+        listenToGroupUpdates()
     }
 
     fun getMessagesForConversation(conversationId: String): Flow<List<ChatMessage>> {
         return messageDao.getMessagesForConversation(conversationId)
+    }
+
+    private fun listenToGroupUpdates() {
+        scope.launch {
+            discoveryService.events.collect { event ->
+                if (event is LanEvent.GroupUpdateEvent) {
+                    val existing = conversationDao.getConversationById(event.groupId)
+                    if (existing != null) {
+                        conversationDao.updateGroupTitleAndMembers(event.groupId, event.groupTitle, event.memberIps)
+                    } else {
+                        val group = ChatConversation(
+                            id = event.groupId,
+                            title = event.groupTitle,
+                            isGroup = true,
+                            participantIps = event.memberIps,
+                            lastMessageSnippet = "Group updated",
+                            lastMessageTimestamp = System.currentTimeMillis()
+                        )
+                        conversationDao.insertOrUpdateConversation(group)
+                    }
+                }
+            }
+        }
     }
 
     private fun listenToIncomingMessages() {
@@ -183,11 +207,20 @@ class ChatRepository(
         )
 
         messageDao.insertMessage(message)
-        discoveryService.sendDirectText(targetIp, text)
 
-        val peer = peerDao.getPeerByIp(targetIp)
-        val title = peer?.username ?: targetIp
-        updateConversationSnippet(conversationId, title, text, MessageType.TEXT, incrementUnread = false)
+        if (conversationId.startsWith("group_")) {
+            val conv = conversationDao.getConversationById(conversationId)
+            val ips = conv?.participantIps?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            for (ip in ips) {
+                discoveryService.sendDirectText(ip.trim(), text)
+            }
+            updateConversationSnippet(conversationId, conv?.title ?: "Group", text, MessageType.TEXT, incrementUnread = false)
+        } else {
+            discoveryService.sendDirectText(targetIp, text)
+            val peer = peerDao.getPeerByIp(targetIp)
+            val title = peer?.username ?: targetIp
+            updateConversationSnippet(conversationId, title, text, MessageType.TEXT, incrementUnread = false)
+        }
     }
 
     suspend fun sendFile(conversationId: String, targetIp: String, file: File, type: MessageType) {
@@ -307,9 +340,7 @@ class ChatRepository(
             mediaRecorder = null
             currentRecordingFile?.delete()
             currentRecordingFile = null
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) {}
     }
 
     private suspend fun updateConversationSnippet(
@@ -326,13 +357,36 @@ class ChatRepository(
         val updated = ChatConversation(
             id = conversationId,
             title = title,
+            isGroup = existing?.isGroup ?: conversationId.startsWith("group_"),
+            participantIps = existing?.participantIps ?: "",
             lastMessageSnippet = lastSnippet,
             lastMessageType = type,
             lastMessageTimestamp = System.currentTimeMillis(),
             unreadCount = unread,
-            avatarColorIndex = colorIdx
+            avatarColorIndex = colorIdx,
+            isArchived = existing?.isArchived ?: false,
+            isPinned = existing?.isPinned ?: false,
+            isMuted = existing?.isMuted ?: false,
+            adminIp = existing?.adminIp
         )
         conversationDao.insertOrUpdateConversation(updated)
+    }
+
+    suspend fun setArchived(id: String, isArchived: Boolean) {
+        conversationDao.setArchived(id, isArchived)
+    }
+
+    suspend fun setPinned(id: String, isPinned: Boolean) {
+        conversationDao.setPinned(id, isPinned)
+    }
+
+    suspend fun setMuted(id: String, isMuted: Boolean) {
+        conversationDao.setMuted(id, isMuted)
+    }
+
+    suspend fun updateGroup(groupId: String, newTitle: String, newMemberIps: String) {
+        conversationDao.updateGroupTitleAndMembers(groupId, newTitle, newMemberIps)
+        discoveryService.sendGroupUpdate(groupId, newTitle, newMemberIps)
     }
 
     suspend fun markConversationRead(conversationId: String) {

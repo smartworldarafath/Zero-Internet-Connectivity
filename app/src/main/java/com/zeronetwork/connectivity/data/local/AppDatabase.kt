@@ -11,7 +11,7 @@ import com.zeronetwork.connectivity.data.model.Peer
 
 @Database(
     entities = [ChatMessage::class, Peer::class, ChatConversation::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

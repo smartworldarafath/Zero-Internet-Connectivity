@@ -40,11 +40,18 @@ class PeerRepository(
                             ipAddress = event.ipAddress,
                             username = event.username,
                             avatarColorIndex = colorIdx,
+                            avatarBase64 = event.avatarBase64 ?: existing?.avatarBase64,
                             lastSeen = event.lastSeen,
                             isOnline = true,
                             isTyping = existing?.isTyping ?: false
                         )
                         peerDao.insertPeer(updatedPeer)
+                    }
+                    is LanEvent.AvatarSyncEvent -> {
+                        val existing = peerDao.getPeerByIp(event.senderIp)
+                        if (existing != null) {
+                            peerDao.insertPeer(existing.copy(avatarBase64 = event.avatarBase64))
+                        }
                     }
                     is LanEvent.TypingEvent -> {
                         peerDao.setPeerTyping(event.senderIp, event.isTyping)

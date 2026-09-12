@@ -15,17 +15,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
@@ -34,248 +31,164 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.zeronetwork.connectivity.data.model.CallState
-import com.zeronetwork.connectivity.ui.theme.AvatarColors
-import com.zeronetwork.connectivity.ui.theme.CrimsonRed
-import com.zeronetwork.connectivity.ui.theme.EmeraldGreen
-import com.zeronetwork.connectivity.ui.theme.SignalBlue
-import com.zeronetwork.connectivity.ui.theme.ZeroDarkBackground
 import com.zeronetwork.connectivity.ui.viewmodel.CallViewModel
 
 @Composable
 fun VoiceCallScreen(
     viewModel: CallViewModel,
-    onCallEnded: () -> Unit,
-    modifier: Modifier = Modifier
+    onCallEnded: () -> Unit
 ) {
     val session by viewModel.callSession.collectAsState()
 
     if (session == null) {
-        onCallEnded()
+        LaunchedEffect(Unit) { onCallEnded() }
         return
     }
 
-    val callState = session!!.state
-    val durationSec = session!!.durationSeconds
-    val isMuted = session!!.isMuted
-    val isSpeakerOn = session!!.isSpeakerOn
+    val current = session!!
 
     val transition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by transition.animateFloat(
         initialValue = 1f,
         targetValue = 1.25f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse_scale"
+        label = "pulseScale"
     )
 
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0F172A),
-                        Color(0xFF1E293B),
-                        Color(0xFF0D1B2A)
-                    )
-                )
-            )
-            .statusBarsPadding()
-            .navigationBarsPadding()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .fillMaxWidth()
+                .align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header: Peer info & call status
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 32.dp)
-            ) {
-                Text(
-                    text = session!!.peerName,
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "LAN Peer • ${session!!.peerIp}",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.7f))
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val statusText = when (callState) {
-                    CallState.OUTGOING_CALLING -> "Calling..."
-                    CallState.INCOMING_RINGING -> "Incoming Call..."
-                    CallState.CONNECTED -> {
-                        val mins = durationSec / 60
-                        val secs = durationSec % 60
-                        String.format("%02d:%02d", mins, secs)
-                    }
-                    CallState.ENDED -> "Call Ended"
-                    CallState.REJECTED -> "Call Declined"
-                    CallState.BUSY -> "Busy"
-                    else -> ""
-                }
-
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        color = if (callState == CallState.CONNECTED) EmeraldGreen else SignalBlue,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-            }
-
-            // Central Animated Avatar Pulse
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(200.dp)
-            ) {
-                if (callState == CallState.OUTGOING_CALLING || callState == CallState.INCOMING_RINGING) {
+            Box(contentAlignment = Alignment.Center) {
+                if (current.state == CallState.CONNECTED) {
                     Box(
                         modifier = Modifier
-                            .size(160.dp * pulseScale)
-                            .clip(CircleShape)
-                            .background(SignalBlue.copy(alpha = 0.2f))
+                            .size(170.dp * pulseScale)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
                     )
                 }
 
                 Surface(
                     shape = CircleShape,
-                    color = SignalBlue,
-                    modifier = Modifier.size(110.dp),
-                    shadowElevation = 8.dp
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(130.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = session!!.peerName.take(1).uppercase().ifEmpty { "U" },
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 44.sp,
-                                color = Color.White
-                            )
+                            text = current.peerName.take(2).uppercase(),
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
             }
 
-            // Bottom Call Controls
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 24.dp)
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = current.peerName,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = when (current.state) {
+                    CallState.CONNECTED -> formatCallDuration(current.durationSeconds)
+                    CallState.OUTGOING_CALLING -> "Calling..."
+                    CallState.INCOMING_RINGING -> "Ringing..."
+                    CallState.ENDED -> "Call Ended"
+                    CallState.REJECTED -> "Call Declined"
+                    else -> "Connecting..."
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (current.state == CallState.CONNECTED) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (callState == CallState.INCOMING_RINGING) {
-                    // Accept or Decline buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Decline
-                        IconButton(
-                            onClick = { viewModel.rejectCall() },
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(CrimsonRed)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Decline",
-                                tint = Color.White,
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
+                IconButton(
+                    onClick = { viewModel.toggleMute() },
+                    modifier = Modifier
+                        .background(if (current.isMuted) Color.Red else MaterialTheme.colorScheme.surface, CircleShape)
+                        .size(54.dp)
+                ) {
+                    Icon(
+                        imageVector = if (current.isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                        contentDescription = "Mute",
+                        tint = if (current.isMuted) Color.White else MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-                        // Accept
-                        IconButton(
-                            onClick = { viewModel.acceptCall() },
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(EmeraldGreen)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Call,
-                                contentDescription = "Accept",
-                                tint = Color.White,
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
-                    }
-                } else {
-                    // Connected / In-call controls
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Mute
-                        IconButton(
-                            onClick = { viewModel.toggleMute() },
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(if (isMuted) Color.White else Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Icon(
-                                imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                                contentDescription = "Mute",
-                                tint = if (isMuted) Color.Black else Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
+                IconButton(
+                    onClick = { viewModel.toggleSpeaker() },
+                    modifier = Modifier
+                        .background(if (current.isSpeakerOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface, CircleShape)
+                        .size(54.dp)
+                ) {
+                    Icon(
+                        imageVector = if (current.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
+                        contentDescription = "Speaker",
+                        tint = if (current.isSpeakerOn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-                        // End Call
-                        IconButton(
-                            onClick = { viewModel.endCall() },
-                            modifier = Modifier
-                                .size(68.dp)
-                                .clip(CircleShape)
-                                .background(CrimsonRed)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CallEnd,
-                                contentDescription = "End Call",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-
-                        // Speaker
-                        IconButton(
-                            onClick = { viewModel.toggleSpeaker() },
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(if (isSpeakerOn) Color.White else Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Icon(
-                                imageVector = if (isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
-                                contentDescription = "Speaker",
-                                tint = if (isSpeakerOn) Color.Black else Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
+                IconButton(
+                    onClick = {
+                        viewModel.endCall()
+                        onCallEnded()
+                    },
+                    modifier = Modifier
+                        .background(Color(0xFFEF4444), CircleShape)
+                        .size(60.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CallEnd,
+                        contentDescription = "End Call",
+                        tint = Color.White
+                    )
                 }
             }
         }
     }
+}
+
+private fun formatCallDuration(seconds: Int): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return String.format("%02d:%02d", mins, secs)
 }

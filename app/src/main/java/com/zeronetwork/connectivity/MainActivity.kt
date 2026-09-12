@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,21 +14,19 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.zeronetwork.connectivity.data.model.CallSession
-import com.zeronetwork.connectivity.data.model.Peer
 import com.zeronetwork.connectivity.ui.screens.call.VideoCallScreen
 import com.zeronetwork.connectivity.ui.screens.call.VoiceCallScreen
 import com.zeronetwork.connectivity.ui.screens.chat.ChatDetailScreen
 import com.zeronetwork.connectivity.ui.screens.main.MainScreen
 import com.zeronetwork.connectivity.ui.screens.permissions.PermissionRequestScreen
 import com.zeronetwork.connectivity.ui.screens.settings.SettingsScreen
+import com.zeronetwork.connectivity.ui.screens.updates.AppUpdateScreen
 import com.zeronetwork.connectivity.ui.theme.ZeroNetworkTheme
 import com.zeronetwork.connectivity.ui.viewmodel.CallViewModel
 import com.zeronetwork.connectivity.ui.viewmodel.ChatViewModel
@@ -39,6 +38,7 @@ sealed interface AppNavScreen {
     data object Main : AppNavScreen
     data class ChatDetail(val conversationId: String, val title: String, val isGroup: Boolean) : AppNavScreen
     data object Settings : AppNavScreen
+    data object AppUpdates : AppNavScreen
 }
 
 class MainActivity : ComponentActivity() {
@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity() {
             }
 
             ZeroNetworkTheme(fontKey = userProfile.fontStyleKey) {
-                // Incoming or Active Call Overlay takes highest priority
                 val currentCall = activeCallSession
                 if (currentCall != null) {
                     if (currentCall.isVideo) {
@@ -81,8 +80,8 @@ class MainActivity : ComponentActivity() {
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (slideInHorizontally { width -> width } + fadeIn(tween(300)))
-                                .togetherWith(slideOutHorizontally { width -> -width } + fadeOut(tween(300)))
+                            (slideInHorizontally(animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)) { width -> width } + fadeIn(tween(250)))
+                                .togetherWith(slideOutHorizontally(animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)) { width -> -width / 3 } + fadeOut(tween(200)))
                         },
                         label = "app_navigation"
                     ) { screen ->
@@ -100,6 +99,9 @@ class MainActivity : ComponentActivity() {
                                     viewModel = mainViewModel,
                                     onOpenSettings = {
                                         currentScreen = AppNavScreen.Settings
+                                    },
+                                    onNavigateToUpdates = {
+                                        currentScreen = AppNavScreen.AppUpdates
                                     },
                                     onConversationClick = { convId, title, isGroup ->
                                         currentScreen = AppNavScreen.ChatDetail(convId, title, isGroup)
@@ -132,6 +134,13 @@ class MainActivity : ComponentActivity() {
                             is AppNavScreen.Settings -> {
                                 SettingsScreen(
                                     viewModel = settingsViewModel,
+                                    onNavigateBack = { currentScreen = AppNavScreen.Main }
+                                )
+                            }
+
+                            is AppNavScreen.AppUpdates -> {
+                                AppUpdateScreen(
+                                    updateManager = ZeroNetworkApp.instance.updateManager,
                                     onNavigateBack = { currentScreen = AppNavScreen.Main }
                                 )
                             }

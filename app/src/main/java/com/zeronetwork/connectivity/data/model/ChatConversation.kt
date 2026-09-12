@@ -14,5 +14,9 @@ data class ChatConversation(
     val lastMessageType: MessageType = MessageType.TEXT,
     val lastMessageTimestamp: Long = System.currentTimeMillis(),
     val unreadCount: Int = 0,
-    val avatarColorIndex: Int = 0
+    val avatarColorIndex: Int = 0,
+    val isArchived: Boolean = false,
+    val isPinned: Boolean = false,
+    val isMuted: Boolean = false,
+    val adminIp: String? = null
 )

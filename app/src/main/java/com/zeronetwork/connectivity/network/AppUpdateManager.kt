@@ -49,7 +49,7 @@ class AppUpdateManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gson = Gson()
 
-    val currentVersion = "v1.0.1"
+    val currentVersion = "v1.0.2"
     val releaseUrl = "https://github.com/smartworldarafath/Zero-Internet-Connectivity/releases"
     private val apiUrl = "https://api.github.com/repos/smartworldarafath/Zero-Internet-Connectivity/releases/latest"
 
@@ -110,6 +110,22 @@ class AppUpdateManager(private val context: Context) {
 
     fun dismissHomeBanner() {
         _showHomeBanner.value = false
+    }
+
+    fun downloadLatestRelease() {
+        val rel = _latestRelease.value ?: return
+        val asset = rel.assets.find { it.name.endsWith(".apk") } ?: rel.assets.firstOrNull()
+        if (asset != null) {
+            downloadAndInstallUpdate(asset)
+        } else {
+            // Open release browser page
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rel.htmlUrl.ifBlank { releaseUrl })).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {}
+        }
     }
 
     fun downloadAndInstallUpdate(asset: GitHubAsset) {

@@ -20,7 +20,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
@@ -29,12 +28,14 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 sealed class LanEvent {
-    data class PeerHeartbeat(val ipAddress: String, val username: String, val lastSeen: Long) : LanEvent()
+    data class PeerHeartbeat(val ipAddress: String, val username: String, val lastSeen: Long, val avatarBase64: String? = null) : LanEvent()
     data class TextMessage(val senderIp: String, val text: String, val timestamp: Long) : LanEvent()
     data class FileChunkReceived(val senderIp: String, val fileName: String, val chunkIndex: Int, val totalChunks: Int, val progress: Float) : LanEvent()
     data class FileCompleted(val senderIp: String, val fileName: String, val filePath: String, val fileSize: Long) : LanEvent()
     data class TypingEvent(val senderIp: String, val isTyping: Boolean) : LanEvent()
     data class CallSignal(val signal: RichPacket) : LanEvent()
+    data class AvatarSyncEvent(val senderIp: String, val avatarBase64: String) : LanEvent()
+    data class GroupUpdateEvent(val groupId: String, val groupTitle: String, val memberIps: String) : LanEvent()
 }
 
 class LanDiscoveryService(private val context: Context) {
@@ -63,9 +64,11 @@ class LanDiscoveryService(private val context: Context) {
     private val incompleteFiles = ConcurrentHashMap<String, IncompleteFile>()
 
     private var currentUsername: String = "User"
+    private var currentAvatarBase64: String? = null
 
-    fun start(username: String) {
+    fun start(username: String, avatarBase64: String? = null) {
         currentUsername = username
+        currentAvatarBase64 = avatarBase64
         acquireLocks()
         initSocket()
         startListening()
@@ -121,13 +124,11 @@ class LanDiscoveryService(private val context: Context) {
 
                     val firstByte = buffer[0]
 
-                    // 1. Own address identification packet
                     if (LanPacketHelper.isOwnAddressPacket(buffer, length, ownAddressIdentifier)) {
                         _ownIpAddress.value = senderAddress
                         continue
                     }
 
-                    // Ignore packets from self
                     if (senderAddress == _ownIpAddress.value || senderAddress == "127.0.0.1") {
                         continue
                     }
@@ -175,9 +176,18 @@ class LanDiscoveryService(private val context: Context) {
                                         _events.emit(LanEvent.CallSignal(richPacket.copy(senderIp = senderAddress)))
                                     }
                                     "PEER_PROBE" -> {
-                                        _events.emit(LanEvent.PeerHeartbeat(senderAddress, richPacket.senderName, System.currentTimeMillis()))
-                                        // Respond immediately with heartbeat
+                                        _events.emit(LanEvent.PeerHeartbeat(senderAddress, richPacket.senderName, System.currentTimeMillis(), richPacket.avatarBase64))
                                         sendDirectHeartbeat(senderAddress)
+                                    }
+                                    "AVATAR_UPDATE" -> {
+                                        richPacket.avatarBase64?.let {
+                                            _events.emit(LanEvent.AvatarSyncEvent(senderAddress, it))
+                                        }
+                                    }
+                                    "GROUP_UPDATE" -> {
+                                        if (richPacket.conversationId != null && richPacket.groupTitle != null && richPacket.memberIps != null) {
+                                            _events.emit(LanEvent.GroupUpdateEvent(richPacket.conversationId, richPacket.groupTitle, richPacket.memberIps))
+                                        }
                                     }
                                     else -> {
                                         if (!richPacket.textContent.isNullOrBlank()) {
@@ -189,9 +199,7 @@ class LanDiscoveryService(private val context: Context) {
                         }
                     }
                 } catch (e: Exception) {
-                    if (isActive) {
-                        delay(100)
-                    }
+                    if (isActive) delay(100)
                 }
             }
         }
@@ -233,8 +241,22 @@ class LanDiscoveryService(private val context: Context) {
 
     fun updateUsername(newUsername: String) {
         currentUsername = newUsername
+        scope.launch { sendHeartbeat() }
+    }
+
+    fun updateAvatar(avatarBase64: String?) {
+        currentAvatarBase64 = avatarBase64
         scope.launch {
-            sendHeartbeat()
+            try {
+                val packet = RichPacket(
+                    type = "AVATAR_UPDATE",
+                    senderId = _ownIpAddress.value ?: "me",
+                    senderName = currentUsername,
+                    avatarBase64 = avatarBase64
+                )
+                val data = LanPacketHelper.createRichPacket(packet)
+                sendToAllBroadcastTargets(data)
+            } catch (e: Exception) {}
         }
     }
 
@@ -268,7 +290,7 @@ class LanDiscoveryService(private val context: Context) {
                 val packet = DatagramPacket(heartbeatData, heartbeatData.size, targetAddr, NetworkConstants.DISCOVERY_PORT)
                 socket?.send(packet)
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending direct heartbeat to $targetIp: ${e.message}")
+                Log.e(TAG, "Error sending direct heartbeat: ${e.message}")
             }
         }
     }
@@ -280,7 +302,8 @@ class LanDiscoveryService(private val context: Context) {
                     type = "PEER_PROBE",
                     senderId = _ownIpAddress.value ?: "me",
                     senderName = currentUsername,
-                    targetIp = targetIp
+                    targetIp = targetIp,
+                    avatarBase64 = currentAvatarBase64
                 )
                 val data = LanPacketHelper.createRichPacket(richPacket)
                 val targetAddr = InetAddress.getByName(targetIp)
@@ -299,7 +322,6 @@ class LanDiscoveryService(private val context: Context) {
                 val prefix = localIp.substringBeforeLast(".") + "."
                 val heartbeatData = LanPacketHelper.createHeartbeatPacket(currentUsername)
 
-                // Fast ping sweep across subnet 1..254
                 val jobs = (1..254).map { i ->
                     launch {
                         try {
@@ -322,7 +344,7 @@ class LanDiscoveryService(private val context: Context) {
     private fun sendToAllBroadcastTargets(data: ByteArray) {
         val targets = mutableSetOf<InetAddress>()
         try {
-            targets.add(InetAddress.getByName(NetworkConstants.BROADCAST_ADDRESS)) // 255.255.255.255
+            targets.add(InetAddress.getByName(NetworkConstants.BROADCAST_ADDRESS))
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val intf = interfaces.nextElement()
@@ -389,6 +411,23 @@ class LanDiscoveryService(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending typing indicator: ${e.message}")
             }
+        }
+    }
+
+    fun sendGroupUpdate(groupId: String, groupTitle: String, memberIps: String) {
+        scope.launch {
+            try {
+                val richPacket = RichPacket(
+                    type = "GROUP_UPDATE",
+                    senderId = _ownIpAddress.value ?: "me",
+                    senderName = currentUsername,
+                    conversationId = groupId,
+                    groupTitle = groupTitle,
+                    memberIps = memberIps
+                )
+                val data = LanPacketHelper.createRichPacket(richPacket)
+                sendToAllBroadcastTargets(data)
+            } catch (e: Exception) {}
         }
     }
 

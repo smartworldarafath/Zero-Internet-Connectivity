@@ -1,14 +1,8 @@
 package com.zeronetwork.connectivity.ui.screens.chat
 
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,33 +13,32 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,23 +48,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.zeronetwork.connectivity.data.model.MessageType
+import com.zeronetwork.connectivity.ui.components.FullscreenImageViewer
 import com.zeronetwork.connectivity.ui.components.MediaPickerSheet
 import com.zeronetwork.connectivity.ui.components.SpringMessageBubble
 import com.zeronetwork.connectivity.ui.components.TelegramVoiceRecorderButton
-import com.zeronetwork.connectivity.ui.components.TypingWaveIndicator
-import com.zeronetwork.connectivity.ui.theme.AvatarColors
-import com.zeronetwork.connectivity.ui.theme.EmeraldGreen
-import com.zeronetwork.connectivity.ui.theme.SignalBlue
+import com.zeronetwork.connectivity.ui.screens.group.GroupSettingsDialog
 import com.zeronetwork.connectivity.ui.viewmodel.ChatViewModel
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,55 +67,19 @@ fun ChatDetailScreen(
     viewModel: ChatViewModel,
     onBack: () -> Unit,
     onStartVoiceCall: (String, String) -> Unit,
-    onStartVideoCall: (String, String) -> Unit,
-    modifier: Modifier = Modifier
+    onStartVideoCall: (String, String) -> Unit
 ) {
-    val context = LocalContext.current
-    val messages by viewModel.currentMessages.collectAsState()
-    val inputText by viewModel.inputText.collectAsState()
-    val activePeer by viewModel.activePeer.collectAsState()
-
-    var showMediaSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val messages by viewModel.messages.collectAsState()
+    val isPeerTyping by viewModel.isPeerTyping.collectAsState()
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        uri?.let {
-            val name = getFileName(context, it)
-            viewModel.sendMediaUri(it, name, MessageType.IMAGE)
-        }
-    }
-
-    val videoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        uri?.let {
-            val name = getFileName(context, it)
-            viewModel.sendMediaUri(it, name, MessageType.VIDEO)
-        }
-    }
-
-    val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val name = getFileName(context, it)
-            viewModel.sendMediaUri(it, name, MessageType.FILE)
-        }
-    }
-
-    val audioPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val name = getFileName(context, it)
-            viewModel.sendMediaUri(it, name, MessageType.AUDIO)
-        }
-    }
+    var inputText by remember { mutableStateOf("") }
+    var showMediaPicker by remember { mutableStateOf(false) }
+    var showGroupSettings by remember { mutableStateOf(false) }
+    var showAvatarViewer by remember { mutableStateOf(false) }
 
     LaunchedEffect(conversationId) {
-        viewModel.setConversation(conversationId, activePeer)
+        viewModel.setConversation(conversationId, null)
     }
 
     LaunchedEffect(messages.size) {
@@ -139,159 +88,147 @@ fun ChatDetailScreen(
         }
     }
 
-    Surface(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Chat Top Bar
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.sendFileFromUri(conversationId, uri, null, MessageType.IMAGE)
+        }
+    }
 
-                    val colorIdx = activePeer?.avatarColorIndex ?: (conversationId.hashCode().mod(6).let { if (it < 0) -it else it })
-                    val avatarColor = AvatarColors[colorIdx % AvatarColors.size]
+    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.sendFileFromUri(conversationId, uri, null, MessageType.VIDEO)
+        }
+    }
 
-                    Surface(
-                        shape = CircleShape,
-                        color = avatarColor,
-                        modifier = Modifier.size(40.dp)
+    val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.sendFileFromUri(conversationId, uri, null, MessageType.AUDIO)
+        }
+    }
+
+    val docLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.sendFileFromUri(conversationId, uri, null, MessageType.FILE)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            if (isGroup) showGroupSettings = true
+                            else showAvatarViewer = true
+                        }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = peerTitle.take(1).uppercase(),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = peerTitle,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!isGroup) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (activePeer?.isOnline == true) EmeraldGreen else Color.Gray)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (isGroup) {
+                                    Icon(Icons.Default.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                } else {
+                                    Text(
+                                        text = peerTitle.take(2).uppercase(),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
                             }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column {
                             Text(
-                                text = if (isGroup) "LAN Group" else if (activePeer?.isTyping == true) "typing..." else if (activePeer?.isOnline == true) "online on LAN" else "offline ($conversationId)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = if (activePeer?.isTyping == true) SignalBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                                text = peerTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isGroup) "Group • Tap for info" else (if (isPeerTyping) "Typing..." else "Connected on LAN"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isPeerTyping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
                     if (!isGroup) {
                         IconButton(onClick = { onStartVoiceCall(conversationId, peerTitle) }) {
-                            Icon(
-                                imageVector = Icons.Default.Call,
-                                contentDescription = "Voice Call",
-                                tint = SignalBlue
-                            )
+                            Icon(Icons.Default.Call, contentDescription = "Voice Call")
                         }
-
                         IconButton(onClick = { onStartVideoCall(conversationId, peerTitle) }) {
-                            Icon(
-                                imageVector = Icons.Default.Videocam,
-                                contentDescription = "Video Call",
-                                tint = SignalBlue
-                            )
+                            Icon(Icons.Default.Videocam, contentDescription = "Video Call")
+                        }
+                    } else {
+                        IconButton(onClick = { showGroupSettings = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Group Settings")
                         }
                     }
-                }
-            }
-
-            // Message List
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(messages, key = { it.id }) { message ->
-                    SpringMessageBubble(message = message)
-                }
-
-                if (activePeer?.isTyping == true) {
-                    item {
-                        TypingWaveIndicator(senderName = peerTitle)
-                    }
+                items(messages, key = { it.id }) { msg ->
+                    SpringMessageBubble(
+                        message = msg,
+                        onMediaClick = {
+                            showAvatarViewer = true
+                        }
+                    )
                 }
             }
 
-            // Bottom Composer Bar with Telegram Voice Recorder
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
+                shadowElevation = 8.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    IconButton(onClick = { showMediaSheet = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Attach Media",
-                            tint = SignalBlue,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(SignalBlue.copy(alpha = 0.12f))
-                                .padding(4.dp)
-                        )
+                    IconButton(onClick = { showMediaPicker = true }) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "Attach")
                     }
 
                     OutlinedTextField(
                         value = inputText,
-                        onValueChange = { viewModel.onTextChanged(it) },
-                        placeholder = { Text("Message...", style = MaterialTheme.typography.bodyMedium) },
-                        shape = RoundedCornerShape(24.dp),
+                        onValueChange = {
+                            inputText = it
+                            viewModel.setTyping(conversationId, it.isNotBlank())
+                        },
+                        placeholder = { Text("Type an offline message...") },
+                        singleLine = false,
                         maxLines = 4,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 4.dp)
@@ -299,65 +236,65 @@ fun ChatDetailScreen(
 
                     if (inputText.isNotBlank()) {
                         IconButton(
-                            onClick = { viewModel.sendMessage() },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(SignalBlue)
+                            onClick = {
+                                val text = inputText.trim()
+                                if (text.isNotBlank()) {
+                                    viewModel.sendMessage(conversationId, text)
+                                    inputText = ""
+                                    viewModel.setTyping(conversationId, false)
+                                }
+                            }
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Send",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     } else {
-                        // Telegram-Style Hold-to-record Voice Button
                         TelegramVoiceRecorderButton(
-                            onVoiceRecorded = { file, durationSec ->
-                                viewModel.sendMediaUri(Uri.fromFile(file), file.name, MessageType.AUDIO)
+                            onVoiceRecorded = { file, duration ->
+                                viewModel.sendFile(conversationId, file, MessageType.AUDIO)
                             }
                         )
                     }
                 }
             }
         }
-
-        // Media Picker Bottom Sheet
-        if (showMediaSheet) {
-            MediaPickerSheet(
-                onDismiss = { showMediaSheet = false },
-                onPickImage = {
-                    photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-                onPickVideo = {
-                    videoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
-                    )
-                },
-                onPickAudio = {
-                    audioPickerLauncher.launch("audio/*")
-                },
-                onPickFile = {
-                    documentPickerLauncher.launch("*/*")
-                }
-            )
-        }
     }
-}
 
-private fun getFileName(context: android.content.Context, uri: Uri): String {
-    var name = "file_${System.currentTimeMillis()}"
-    try {
-        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (nameIndex != -1 && cursor.moveToFirst()) {
-                name = cursor.getString(nameIndex)
+    if (showMediaPicker) {
+        MediaPickerSheet(
+            onDismiss = { showMediaPicker = false },
+            onPickImage = { photoLauncher.launch("image/*") },
+            onPickVideo = { videoLauncher.launch("video/*") },
+            onPickAudio = { audioLauncher.launch("audio/*") },
+            onPickFile = { docLauncher.launch("*/*") }
+        )
+    }
+
+    if (showGroupSettings) {
+        GroupSettingsDialog(
+            groupId = conversationId,
+            currentTitle = peerTitle,
+            participantIps = "",
+            availablePeers = emptyList(),
+            onDismiss = { showGroupSettings = false },
+            onUpdateGroup = { newTitle, newIps ->
+                viewModel.updateGroup(conversationId, newTitle, newIps)
+            },
+            onClearGroupChat = { viewModel.clearHistory(conversationId) },
+            onLeaveGroup = {
+                viewModel.clearHistory(conversationId)
+                onBack()
             }
-        }
-    } catch (e: Exception) {}
-    return name
+        )
+    }
+
+    if (showAvatarViewer) {
+        FullscreenImageViewer(
+            title = peerTitle,
+            onDismiss = { showAvatarViewer = false }
+        )
+    }
 }

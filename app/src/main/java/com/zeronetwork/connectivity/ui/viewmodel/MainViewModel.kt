@@ -35,6 +35,9 @@ class MainViewModel : ViewModel() {
     val conversations: StateFlow<List<ChatConversation>> = chatRepo.conversations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val archivedConversations: StateFlow<List<ChatConversation>> = chatRepo.archivedConversations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val onlinePeers: StateFlow<List<Peer>> = peerRepo.onlinePeers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -80,19 +83,52 @@ class MainViewModel : ViewModel() {
         discoveryService.probePeer(ip)
     }
 
-    fun createGroup(groupName: String, selectedPeers: List<Peer>) {
-        if (groupName.isBlank()) return
+    fun saveUserProfile(profile: UserProfile) {
+        prefs.updateProfile(profile)
+        discoveryService.updateUsername(profile.username)
+        discoveryService.updateAvatar(profile.avatarUri)
+    }
+
+    fun togglePin(conversation: ChatConversation) {
         viewModelScope.launch {
-            val ips = selectedPeers.joinToString(",") { it.ipAddress }
+            chatRepo.setPinned(conversation.id, !conversation.isPinned)
+        }
+    }
+
+    fun toggleArchive(conversation: ChatConversation) {
+        viewModelScope.launch {
+            chatRepo.setArchived(conversation.id, !conversation.isArchived)
+        }
+    }
+
+    fun toggleMute(conversation: ChatConversation) {
+        viewModelScope.launch {
+            chatRepo.setMuted(conversation.id, !conversation.isMuted)
+        }
+    }
+
+    fun deleteConversation(conversation: ChatConversation) {
+        viewModelScope.launch {
+            chatRepo.clearHistory(conversation.id)
+        }
+    }
+
+    fun createGroup(groupName: String, selectedMemberIps: List<String>) {
+        if (groupName.isBlank() || selectedMemberIps.isEmpty()) return
+        viewModelScope.launch {
+            val ips = selectedMemberIps.joinToString(",")
+            val groupId = "group_${System.currentTimeMillis()}"
             val conv = ChatConversation(
-                id = "group_${System.currentTimeMillis()}",
+                id = groupId,
                 title = groupName,
                 isGroup = true,
                 participantIps = ips,
-                lastMessageSnippet = "Group created with ${selectedPeers.size} members",
-                lastMessageTimestamp = System.currentTimeMillis()
+                lastMessageSnippet = "Group created with ${selectedMemberIps.size} members",
+                lastMessageTimestamp = System.currentTimeMillis(),
+                adminIp = discoveryService.ownIpAddress.value
             )
             app.database.conversationDao().insertOrUpdateConversation(conv)
+            discoveryService.sendGroupUpdate(groupId, groupName, ips)
             showCreateGroup.value = false
         }
     }

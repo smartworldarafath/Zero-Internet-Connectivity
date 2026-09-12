@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,17 +57,19 @@ import kotlinx.coroutines.launch
 fun MainScreen(
     viewModel: MainViewModel,
     onOpenSettings: () -> Unit,
+    onNavigateToUpdates: () -> Unit,
     onConversationClick: (String, String, Boolean) -> Unit,
     onStartVoiceCall: (Peer) -> Unit,
     onStartVideoCall: (Peer) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentTab by viewModel.currentTab.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
+    val archivedConversations by viewModel.archivedConversations.collectAsState()
     val onlinePeers by viewModel.onlinePeers.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
     val networkStats by viewModel.networkStats.collectAsState()
+    val ownIp by viewModel.ownIpAddress.collectAsState()
     val isMenuOpen by viewModel.showMenuPopup.collectAsState()
     val showCreateGroup by viewModel.showCreateGroup.collectAsState()
     val showHomeBanner by viewModel.showHomeBanner.collectAsState()
@@ -78,7 +78,6 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 2 })
 
-    // Auto-dismiss update banner after 2 seconds
     LaunchedEffect(showHomeBanner) {
         if (showHomeBanner) {
             delay(2000)
@@ -106,7 +105,6 @@ fun MainScreen(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top App Bar
                 SignalTopBar(
                     networkStats = networkStats,
                     isMenuOpen = isMenuOpen,
@@ -115,7 +113,6 @@ fun MainScreen(
                     onOpenCreateGroup = { viewModel.openCreateGroup() }
                 )
 
-                // 2-Second New Update Alert Banner
                 AnimatedVisibility(
                     visible = showHomeBanner && latestRelease != null,
                     enter = slideInVertically() + fadeIn(),
@@ -128,7 +125,7 @@ fun MainScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
                             .clickable {
-                                onOpenSettings()
+                                onNavigateToUpdates()
                                 viewModel.dismissHomeBanner()
                             }
                     ) {
@@ -146,7 +143,7 @@ fun MainScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "🚀 New Update Available: ${latestRelease?.tagName ?: "v1.0.1"} — Tap to View",
+                                text = "🚀 New Update Available: ${latestRelease?.tagName ?: "v1.0.2"} — Tap to View",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
@@ -156,7 +153,6 @@ fun MainScreen(
                 }
 
                 if (currentTab != BottomTab.PROFILE) {
-                    // Top Tab Row
                     TabRow(
                         selectedTabIndex = pagerState.currentPage,
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -207,39 +203,48 @@ fun MainScreen(
                         when (page) {
                             0 -> ChatsTab(
                                 conversations = conversations,
+                                archivedConversations = archivedConversations,
                                 onlinePeers = onlinePeers,
-                                searchQuery = searchQuery,
-                                onSearchChange = { viewModel.searchQuery.value = it },
-                                onConversationClick = onConversationClick,
-                                onFindOthersClick = { scope.launch { pagerState.animateScrollToPage(1) } }
+                                onConversationClick = { conv -> onConversationClick(conv.id, conv.title, conv.isGroup) },
+                                onPinToggle = { conv -> viewModel.togglePin(conv) },
+                                onArchiveToggle = { conv -> viewModel.toggleArchive(conv) },
+                                onMuteToggle = { conv -> viewModel.toggleMute(conv) },
+                                onDeleteConversation = { conv -> viewModel.deleteConversation(conv) }
                             )
                             1 -> FindOthersScreen(
-                                onPeerSelected = { peer -> onConversationClick(peer.ipAddress, peer.username, false) },
-                                onStartVoiceCall = onStartVoiceCall,
-                                onStartVideoCall = onStartVideoCall
+                                onlinePeers = onlinePeers,
+                                ownIp = ownIp,
+                                ownUsername = userProfile.username,
+                                onPeerClick = { peer -> onConversationClick(peer.ipAddress, peer.username, false) },
+                                onVoiceCallClick = onStartVoiceCall,
+                                onVideoCallClick = onStartVideoCall,
+                                onRefreshScan = { viewModel.triggerSubnetScan() },
+                                onManualConnect = { ip -> viewModel.probePeer(ip) }
                             )
                         }
                     }
                 } else {
                     Box(modifier = Modifier.weight(1f)) {
-                        ProfileScreen()
+                        ProfileScreen(
+                            userProfile = userProfile,
+                            onSaveProfile = { viewModel.saveUserProfile(it) },
+                            onNavigateToUpdates = onNavigateToUpdates
+                        )
                     }
                 }
             }
 
-            // Bottom Navigation Dock
             BottomDock(
                 currentTab = currentTab,
                 onTabSelected = { tab -> viewModel.setTab(tab) },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
-            // Create Group Dialog
             if (showCreateGroup) {
                 CreateGroupDialog(
-                    onlinePeers = onlinePeers,
+                    availablePeers = onlinePeers,
                     onDismiss = { viewModel.closeCreateGroup() },
-                    onCreateGroup = { name, peers -> viewModel.createGroup(name, peers) }
+                    onCreateGroup = { name, memberIps -> viewModel.createGroup(name, memberIps) }
                 )
             }
         }

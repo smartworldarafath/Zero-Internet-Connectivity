@@ -27,16 +27,16 @@ class ChatViewModel : ViewModel() {
     val activePeer = MutableStateFlow<Peer?>(null)
     val inputText = MutableStateFlow("")
     val isRecordingVoice = MutableStateFlow(false)
+    val isPeerTyping = MutableStateFlow(false)
     val recordingDurationSec = MutableStateFlow(0)
     val audioAmplitudes = MutableStateFlow<List<Float>>(emptyList())
 
     private var recordingTimerJob: Job? = null
     private var typingJob: Job? = null
-
-    val messages: StateFlow<List<ChatMessage>> = MutableStateFlow<List<ChatMessage>>(emptyList())
     private var messageFlowJob: Job? = null
+
     private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val currentMessages: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
+    val messages: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
 
     fun setConversation(conversationId: String, peer: Peer?) {
         activeConversationId.value = conversationId
@@ -51,37 +51,31 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun onTextChanged(newText: String) {
-        inputText.value = newText
-        val peerIp = activePeer.value?.ipAddress ?: activeConversationId.value
-        if (peerIp.isNotEmpty() && !activeConversationId.value.startsWith("group_")) {
-            peerRepo.sendTyping(peerIp, newText.isNotEmpty())
-            typingJob?.cancel()
-            typingJob = viewModelScope.launch {
-                delay(3000)
-                peerRepo.sendTyping(peerIp, false)
-            }
+    fun setTyping(conversationId: String, isTyping: Boolean) {
+        val peerIp = activePeer.value?.ipAddress ?: conversationId
+        if (peerIp.isNotBlank() && !conversationId.startsWith("group_")) {
+            peerRepo.sendTyping(peerIp, isTyping)
         }
     }
 
-    fun sendMessage() {
-        val text = inputText.value.trim()
-        if (text.isEmpty()) return
-        val convId = activeConversationId.value
-        val targetIp = activePeer.value?.ipAddress ?: convId
-        inputText.value = ""
-
+    fun sendMessage(conversationId: String, text: String) {
+        val targetIp = activePeer.value?.ipAddress ?: conversationId
         viewModelScope.launch {
-            peerRepo.sendTyping(targetIp, false)
-            chatRepo.sendTextMessage(convId, targetIp, text)
+            chatRepo.sendTextMessage(conversationId, targetIp, text)
         }
     }
 
-    fun sendMediaUri(uri: Uri, fileName: String?, type: MessageType) {
-        val convId = activeConversationId.value
-        val targetIp = activePeer.value?.ipAddress ?: convId
+    fun sendFile(conversationId: String, file: File, type: MessageType) {
+        val targetIp = activePeer.value?.ipAddress ?: conversationId
         viewModelScope.launch {
-            chatRepo.sendFileFromUri(convId, targetIp, uri, fileName, type)
+            chatRepo.sendFile(conversationId, targetIp, file, type)
+        }
+    }
+
+    fun sendFileFromUri(conversationId: String, uri: Uri, fileName: String?, type: MessageType) {
+        val targetIp = activePeer.value?.ipAddress ?: conversationId
+        viewModelScope.launch {
+            chatRepo.sendFileFromUri(conversationId, targetIp, uri, fileName, type)
         }
     }
 
@@ -113,14 +107,17 @@ class ChatViewModel : ViewModel() {
         return started
     }
 
-    fun stopAndSendVoiceRecording() {
-        val convId = activeConversationId.value
-        val targetIp = activePeer.value?.ipAddress ?: convId
+    fun getVoiceAmplitude(): Float {
+        return (chatRepo.getMaxAmplitude() / 32767f).coerceIn(0.05f, 1.0f)
+    }
+
+    fun stopAndSendVoiceRecording(conversationId: String) {
+        val targetIp = activePeer.value?.ipAddress ?: conversationId
         recordingTimerJob?.cancel()
         isRecordingVoice.value = false
 
         viewModelScope.launch {
-            chatRepo.stopAndSendVoiceRecording(convId, targetIp)
+            chatRepo.stopAndSendVoiceRecording(conversationId, targetIp)
         }
     }
 
@@ -128,5 +125,17 @@ class ChatViewModel : ViewModel() {
         recordingTimerJob?.cancel()
         isRecordingVoice.value = false
         chatRepo.cancelVoiceRecording()
+    }
+
+    fun updateGroup(groupId: String, newTitle: String, newIps: String) {
+        viewModelScope.launch {
+            chatRepo.updateGroup(groupId, newTitle, newIps)
+        }
+    }
+
+    fun clearHistory(conversationId: String) {
+        viewModelScope.launch {
+            chatRepo.clearHistory(conversationId)
+        }
     }
 }
