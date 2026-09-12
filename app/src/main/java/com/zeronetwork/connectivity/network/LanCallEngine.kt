@@ -82,6 +82,10 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
     private fun handleIncomingSignal(signal: RichPacket) {
         when (signal.type) {
             "CALL_INVITE" -> {
+                val myIp = discoveryService.ownIpAddress.value
+                if (!signal.targetIp.isNullOrBlank() && myIp != null && signal.targetIp != myIp && myIp != "127.0.0.1") {
+                    return
+                }
                 val current = _callSession.value
                 if (current != null && current.state == CallState.CONNECTED) {
                     discoveryService.sendCallSignal(
@@ -156,6 +160,7 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
                 type = "CALL_INVITE",
                 senderId = discoveryService.ownIpAddress.value ?: "",
                 senderName = discoveryService.ownIpAddress.value ?: "User",
+                targetIp = peerIp,
                 callId = callId,
                 isVideo = isVideo
             )
@@ -372,24 +377,20 @@ class LanCallEngine(private val context: Context, private val discoveryService: 
     }
 
     private fun imageProxyToJpeg(image: ImageProxy): ByteArray? {
-        val planes = image.planes
-        val yBuffer = planes[0].buffer
-        val uBuffer = planes[1].buffer
-        val vBuffer = planes[2].buffer
-
-        val ySize = yBuffer.remaining()
-        val uSize = uBuffer.remaining()
-        val vSize = vBuffer.remaining()
-
-        val nv21 = ByteArray(ySize + uSize + vSize)
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
-
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 45, out)
-        return out.toByteArray()
+        return try {
+            val bitmap = image.toBitmap()
+            val targetWidth = 320
+            val targetHeight = (320f * bitmap.height / bitmap.width).toInt().coerceAtLeast(180)
+            val scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+            val out = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 45, out)
+            val bytes = out.toByteArray()
+            if (scaled != bitmap) scaled.recycle()
+            bitmap.recycle()
+            bytes
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun toggleMute() {

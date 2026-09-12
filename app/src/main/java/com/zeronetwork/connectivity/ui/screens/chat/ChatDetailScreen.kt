@@ -3,6 +3,7 @@ package com.zeronetwork.connectivity.ui.screens.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,30 +52,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.zeronetwork.connectivity.data.model.MessageType
 import com.zeronetwork.connectivity.ui.components.FullscreenImageViewer
 import com.zeronetwork.connectivity.ui.components.MediaPickerSheet
 import com.zeronetwork.connectivity.ui.components.SpringMessageBubble
 import com.zeronetwork.connectivity.ui.components.TelegramVoiceRecorderButton
+import com.zeronetwork.connectivity.ui.components.TypingWaveIndicator
 import com.zeronetwork.connectivity.ui.screens.group.GroupSettingsDialog
 import com.zeronetwork.connectivity.ui.viewmodel.ChatViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(
     conversationId: String,
     peerTitle: String,
-    isGroup: Boolean,
-    viewModel: ChatViewModel,
+    isGroup: Boolean = false,
     onBack: () -> Unit,
     onStartVoiceCall: (String, String) -> Unit,
-    onStartVideoCall: (String, String) -> Unit
+    onStartVideoCall: (String, String) -> Unit,
+    viewModel: ChatViewModel = viewModel()
 ) {
-    val listState = rememberLazyListState()
+    val context = LocalContext.current
     val messages by viewModel.messages.collectAsState()
     val isPeerTyping by viewModel.isPeerTyping.collectAsState()
+    val listState = rememberLazyListState()
 
     var inputText by remember { mutableStateOf("") }
     var showMediaPicker by remember { mutableStateOf(false) }
@@ -84,7 +97,7 @@ fun ChatDetailScreen(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.animateScrollToItem(messages.size)
         }
     }
 
@@ -123,53 +136,88 @@ fun ChatDetailScreen(
                             else showAvatarViewer = true
                         }
                     ) {
+                        // Soft pastel avatar matching screenshot
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(40.dp)
+                            color = Color(0xFFEADCF7),
+                            modifier = Modifier.size(42.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 if (isGroup) {
-                                    Icon(Icons.Default.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.Group, contentDescription = null, tint = Color(0xFF6B21A8))
                                 } else {
+                                    val initials = peerTitle.split(" ")
+                                        .filter { it.isNotBlank() }
+                                        .take(2)
+                                        .map { it.first().uppercase() }
+                                        .joinToString("")
+                                        .ifEmpty { peerTitle.take(2).uppercase() }
                                     Text(
-                                        text = peerTitle.take(2).uppercase(),
-                                        style = MaterialTheme.typography.titleSmall,
+                                        text = initials,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = Color(0xFF6B21A8)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Column {
                             Text(
                                 text = peerTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isGroup) "Group • Tap for info" else (if (isPeerTyping) "Typing..." else "Connected on LAN"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isPeerTyping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                text = if (isGroup) "Group • Tap for settings" else (if (isPeerTyping) "Typing..." else "Contact"),
+                                fontSize = 12.sp,
+                                color = if (isPeerTyping) MaterialTheme.colorScheme.primary else Color(0xFF64748B)
                             )
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White,
+                        shadowElevation = 1.dp,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(38.dp)
+                            .clickable { onBack() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color(0xFF1E293B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 },
                 actions = {
                     if (!isGroup) {
-                        IconButton(onClick = { onStartVoiceCall(conversationId, peerTitle) }) {
-                            Icon(Icons.Default.Call, contentDescription = "Voice Call")
-                        }
-                        IconButton(onClick = { onStartVideoCall(conversationId, peerTitle) }) {
-                            Icon(Icons.Default.Videocam, contentDescription = "Video Call")
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White,
+                            shadowElevation = 1.dp,
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .size(38.dp)
+                                .clickable { onStartVoiceCall(conversationId, peerTitle) }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = "Voice Call",
+                                    tint = Color(0xFF0F4C81),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     } else {
                         IconButton(onClick = { showGroupSettings = true }) {
@@ -191,9 +239,39 @@ fun ChatDetailScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Exact Top Encryption Banner from Screenshot
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFF1F5F9),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "This chat is end-to-end encrypted and stored only on these two devices.",
+                                fontSize = 12.5.sp,
+                                color = Color(0xFF475569),
+                                lineHeight = 17.sp
+                            )
+                        }
+                    }
+                }
+
                 items(messages, key = { it.id }) { msg ->
                     SpringMessageBubble(
                         message = msg,
@@ -204,57 +282,108 @@ fun ChatDetailScreen(
                 }
             }
 
+            // Typing Indicator
+            if (isPeerTyping) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TypingWaveIndicator()
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$peerTitle is typing...",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Exact Bottom Input Bar from Screenshot
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp,
+                shadowElevation = 4.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    IconButton(onClick = { showMediaPicker = true }) {
-                        Icon(Icons.Default.AttachFile, contentDescription = "Attach")
+                    // Circular paperclip button on left
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White,
+                        shadowElevation = 1.dp,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clickable { showMediaPicker = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.AttachFile,
+                                contentDescription = "Attach",
+                                tint = Color(0xFF1E293B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
+                    // Rounded pill text field "Type a message"
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = {
                             inputText = it
-                            viewModel.setTyping(conversationId, it.isNotBlank())
+                            viewModel.setTyping(conversationId, it.isNotEmpty())
                         },
-                        placeholder = { Text("Type an offline message...") },
-                        singleLine = false,
-                        maxLines = 4,
-                        shape = RoundedCornerShape(20.dp),
+                        placeholder = {
+                            Text("Type a message", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFCBD5E1),
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        ),
+                        singleLine = true,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 4.dp)
+                            .height(48.dp)
                     )
 
+                    // Right Button: If text entered, Send button; otherwise circular dark mic button!
                     if (inputText.isNotBlank()) {
-                        IconButton(
-                            onClick = {
-                                val text = inputText.trim()
-                                if (text.isNotBlank()) {
-                                    viewModel.sendMessage(conversationId, text)
-                                    inputText = ""
-                                    viewModel.setTyping(conversationId, false)
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF0F4C81),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clickable {
+                                    val toSend = inputText.trim()
+                                    if (toSend.isNotEmpty()) {
+                                        viewModel.sendMessage(conversationId, toSend)
+                                        inputText = ""
+                                        viewModel.setTyping(conversationId, false)
+                                    }
                                 }
-                            }
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     } else {
                         TelegramVoiceRecorderButton(
-                            onVoiceRecorded = { file, duration ->
-                                viewModel.sendFile(conversationId, file, MessageType.AUDIO)
+                            onVoiceRecorded = { voiceFile, durationSec ->
+                                viewModel.sendFile(conversationId, voiceFile, MessageType.AUDIO)
                             }
                         )
                     }
@@ -263,16 +392,30 @@ fun ChatDetailScreen(
         }
     }
 
+    // Media Picker Sheet
     if (showMediaPicker) {
         MediaPickerSheet(
             onDismiss = { showMediaPicker = false },
-            onPickImage = { photoLauncher.launch("image/*") },
-            onPickVideo = { videoLauncher.launch("video/*") },
-            onPickAudio = { audioLauncher.launch("audio/*") },
-            onPickFile = { docLauncher.launch("*/*") }
+            onPickImage = {
+                showMediaPicker = false
+                photoLauncher.launch("image/*")
+            },
+            onPickVideo = {
+                showMediaPicker = false
+                videoLauncher.launch("video/*")
+            },
+            onPickAudio = {
+                showMediaPicker = false
+                audioLauncher.launch("audio/*")
+            },
+            onPickFile = {
+                showMediaPicker = false
+                docLauncher.launch("*/*")
+            }
         )
     }
 
+    // Group Settings Dialog
     if (showGroupSettings) {
         GroupSettingsDialog(
             groupId = conversationId,
@@ -280,9 +423,7 @@ fun ChatDetailScreen(
             participantIps = "",
             availablePeers = emptyList(),
             onDismiss = { showGroupSettings = false },
-            onUpdateGroup = { newTitle, newIps ->
-                viewModel.updateGroup(conversationId, newTitle, newIps)
-            },
+            onUpdateGroup = { newTitle, newIps -> viewModel.updateGroup(conversationId, newTitle, newIps) },
             onClearGroupChat = { viewModel.clearHistory(conversationId) },
             onLeaveGroup = {
                 viewModel.clearHistory(conversationId)
@@ -291,9 +432,12 @@ fun ChatDetailScreen(
         )
     }
 
+    // Fullscreen Avatar Lightbox
     if (showAvatarViewer) {
         FullscreenImageViewer(
             title = peerTitle,
+            imageBase64 = null,
+            avatarColorIndex = 0,
             onDismiss = { showAvatarViewer = false }
         )
     }

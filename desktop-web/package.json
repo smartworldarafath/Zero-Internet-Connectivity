@@ -1,0 +1,16 @@
+{
+  "name": "zero-network-desktop-web",
+  "version": "1.0.0",
+  "description": "Desktop Web Client and LAN Gateway for Zero Network Connectivity",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "ws": "^8.17.0"
+  },
+  "author": "Md Arafath Rahman",
+  "license": "MIT"
+}

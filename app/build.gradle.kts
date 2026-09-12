@@ -14,8 +14,8 @@ android {
         applicationId = "com.zeronetwork.connectivity"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -100,7 +100,7 @@ tasks.register("copyApkToOutput") {
         val bDir = layout.buildDirectory.get().asFile
         bDir.walkTopDown().forEach { file ->
             if (file.isFile && file.extension == "apk") {
-                val target = File(destDir, "ZeroNetworkConnectivity-v1.0.2.apk")
+                val target = File(destDir, "ZeroNetworkConnectivity-v1.0.3.apk")
                 file.copyTo(target, overwrite = true)
                 println("SUCCESS: Copied APK from ${file.absolutePath} to ${target.absolutePath} (${target.length()} bytes)")
                 copied = true
@@ -109,7 +109,7 @@ tasks.register("copyApkToOutput") {
         if (!copied) {
             rootProject.projectDir.walkTopDown().forEach { file ->
                 if (file.isFile && file.extension == "apk") {
-                    val target = File(destDir, "ZeroNetworkConnectivity-v1.0.2.apk")
+                    val target = File(destDir, "ZeroNetworkConnectivity-v1.0.3.apk")
                     file.copyTo(target, overwrite = true)
                     println("SUCCESS: Copied APK from ${file.absolutePath} to ${target.absolutePath} (${target.length()} bytes)")
                     copied = true

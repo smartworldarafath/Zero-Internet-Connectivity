@@ -36,6 +36,7 @@ sealed class LanEvent {
     data class CallSignal(val signal: RichPacket) : LanEvent()
     data class AvatarSyncEvent(val senderIp: String, val avatarBase64: String) : LanEvent()
     data class GroupUpdateEvent(val groupId: String, val groupTitle: String, val memberIps: String) : LanEvent()
+    data class QrConnectHandshake(val senderIp: String, val senderName: String, val avatarBase64: String?) : LanEvent()
 }
 
 class LanDiscoveryService(private val context: Context) {
@@ -168,7 +169,15 @@ class LanDiscoveryService(private val context: Context) {
                         NetworkConstants.TYPE_RICH_SIGNAL -> {
                             val richPacket = LanPacketHelper.parseRichPacket(buffer, length)
                             if (richPacket != null) {
+                                val myIp = _ownIpAddress.value
+                                if (!richPacket.targetIp.isNullOrBlank() && myIp != null && richPacket.targetIp != myIp && myIp != "127.0.0.1") {
+                                    // Peer isolation: Packet is targeted to a specific peer and not for us
+                                    continue
+                                }
                                 when (richPacket.type) {
+                                    "QR_CONNECT_HANDSHAKE" -> {
+                                        _events.emit(LanEvent.QrConnectHandshake(senderAddress, richPacket.senderName, richPacket.avatarBase64))
+                                    }
                                     "TYPING" -> {
                                         _events.emit(LanEvent.TypingEvent(senderAddress, richPacket.isTyping))
                                     }
@@ -434,12 +443,34 @@ class LanDiscoveryService(private val context: Context) {
     fun sendCallSignal(targetIp: String, packet: RichPacket) {
         scope.launch {
             try {
-                val packetData = LanPacketHelper.createRichPacket(packet)
+                val targetedPacket = packet.copy(targetIp = targetIp, senderIp = _ownIpAddress.value ?: "")
+                val packetData = LanPacketHelper.createRichPacket(targetedPacket)
                 val targetAddr = InetAddress.getByName(targetIp)
                 val datagram = DatagramPacket(packetData, packetData.size, targetAddr, NetworkConstants.DISCOVERY_PORT)
                 socket?.send(datagram)
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending call signal: ${e.message}")
+            }
+        }
+    }
+
+    fun sendQrConnectHandshake(targetIp: String, ownUsername: String, ownAvatarBase64: String?) {
+        scope.launch {
+            try {
+                val packet = RichPacket(
+                    type = "QR_CONNECT_HANDSHAKE",
+                    senderId = _ownIpAddress.value ?: "me",
+                    senderName = ownUsername,
+                    senderIp = _ownIpAddress.value ?: "",
+                    targetIp = targetIp,
+                    avatarBase64 = ownAvatarBase64
+                )
+                val data = LanPacketHelper.createRichPacket(packet)
+                val targetAddr = InetAddress.getByName(targetIp)
+                val datagram = DatagramPacket(data, data.size, targetAddr, NetworkConstants.DISCOVERY_PORT)
+                socket?.send(datagram)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending QR handshake: ${e.message}")
             }
         }
     }

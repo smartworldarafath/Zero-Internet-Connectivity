@@ -12,3 +12,7 @@
 *.aab
 reference_repo/
 .kotlin/
+desktop-web/node_modules/
+desktop-web/received_files/
+desktop-web/temp_uploads/
+

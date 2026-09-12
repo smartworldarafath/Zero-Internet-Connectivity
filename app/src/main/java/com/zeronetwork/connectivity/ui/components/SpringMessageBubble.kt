@@ -22,20 +22,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhoneMissed
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,12 +58,6 @@ import coil.compose.AsyncImage
 import com.zeronetwork.connectivity.data.model.ChatMessage
 import com.zeronetwork.connectivity.data.model.MessageStatus
 import com.zeronetwork.connectivity.data.model.MessageType
-import com.zeronetwork.connectivity.ui.theme.BubbleReceivedDark
-import com.zeronetwork.connectivity.ui.theme.BubbleSentEmerald
-import com.zeronetwork.connectivity.ui.theme.BubbleSentMidnight
-import com.zeronetwork.connectivity.ui.theme.BubbleSentPurple
-import com.zeronetwork.connectivity.ui.theme.BubbleSentSignal
-import com.zeronetwork.connectivity.ui.theme.BubbleSentSunset
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -81,55 +72,99 @@ fun SpringMessageBubble(
     val context = LocalContext.current
     val isMine = message.isMine
 
-    // Telegram-style spring scale and translation animation
-    val scale = remember { Animatable(0.75f) }
-    val offsetY = remember { Animatable(30f) }
+    // Spring animation on message entry
+    val scale = remember { Animatable(0.85f) }
+    val offsetY = remember { Animatable(20f) }
 
     LaunchedEffect(message.id) {
         scale.animateTo(
             targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
         )
     }
 
     LaunchedEffect(message.id) {
         offsetY.animateTo(
             targetValue = 0f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
         )
     }
 
-    val bubbleColor = if (isMine) {
-        when (bubbleColorKey) {
-            "EMERALD" -> BubbleSentEmerald
-            "PURPLE" -> BubbleSentPurple
-            "SUNSET" -> BubbleSentSunset
-            "MIDNIGHT" -> BubbleSentMidnight
-            else -> BubbleSentSignal
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val timeString = remember(message.timestamp) { timeFormatter.format(Date(message.timestamp)) }
+
+    val isMissedCall = message.type == MessageType.CALL_LOG || message.content.contains("Missed call", ignoreCase = true)
+
+    if (isMissedCall) {
+        // Exact Missed Call Card from Screenshot
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    translationY = offsetY.value
+                },
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 1.5.dp,
+                modifier = Modifier.widthIn(min = 180.dp, max = 240.dp)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFFFDE8E8), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhoneMissed,
+                                contentDescription = null,
+                                tint = Color(0xFFE02424),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Text(
+                            text = "Missed call",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = timeString,
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
         }
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        return
     }
 
-    val textColor = if (isMine) Color.White else MaterialTheme.colorScheme.onSurface
-    val timeColor = if (isMine) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-
-    val bubbleShape = if (isMine) {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp)
-    } else {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp)
-    }
+    // Exact Bubble Colors from Screenshot:
+    // Sent (Mine): Soft Sky Blue #D9EBF7
+    // Received (Theirs): Crisp Clean White #FFFFFF with subtle border/shadow
+    val bubbleColor = if (isMine) Color(0xFFD9EBF7) else Color.White
+    val textColor = Color(0xFF1E293B)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 3.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
@@ -138,291 +173,226 @@ fun SpringMessageBubble(
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
         Surface(
-            shape = bubbleShape,
+            shape = RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isMine) 18.dp else 4.dp,
+                bottomEnd = if (isMine) 4.dp else 18.dp
+            ),
             color = bubbleColor,
-            shadowElevation = 1.dp,
-            modifier = Modifier.widthIn(max = 310.dp)
+            shadowElevation = if (isMine) 0.5.dp else 1.5.dp,
+            modifier = Modifier.widthIn(min = 80.dp, max = 310.dp)
         ) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                if (!isMine && message.conversationId.startsWith("group_")) {
-                    Text(
-                        text = message.senderName,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                }
-
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
                 when (message.type) {
                     MessageType.TEXT -> {
                         Text(
                             text = message.content,
-                            style = MaterialTheme.typography.bodyLarge,
+                            fontSize = 14.5.sp,
                             color = textColor,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            lineHeight = 20.sp
                         )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.align(Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = if (isMine) "$timeString · Read" else timeString,
+                                fontSize = 11.sp,
+                                color = if (isMine) Color(0xFF475569) else Color(0xFF94A3B8),
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+                    }
+
+                    MessageType.AUDIO -> {
+                        // Exact Voice Note Bubble from Screenshot
+                        var isPlaying by remember { mutableStateOf(false) }
+                        var playbackProgress by remember { mutableFloatStateOf(0f) }
+                        var currentSec by remember { mutableStateOf("0:00") }
+                        var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+                        val durationFormatted = remember(message.durationMs) {
+                            val sec = if (message.durationMs > 0) message.durationMs / 1000 else 12L
+                            val m = sec / 60
+                            val s = sec % 60
+                            String.format(Locale.getDefault(), "%d:%02d", m, s)
+                        }
+
+                        DisposableEffect(Unit) {
+                            onDispose {
+                                mediaPlayer?.release()
+                                mediaPlayer = null
+                            }
+                        }
+
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Circular dark blue play/pause button
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color(0xFF0F4C81), CircleShape)
+                                        .clickable {
+                                            if (isPlaying) {
+                                                mediaPlayer?.pause()
+                                                isPlaying = false
+                                            } else {
+                                                try {
+                                                    val path = message.filePath
+                                                    if (path != null && File(path).exists()) {
+                                                        mediaPlayer?.release()
+                                                        mediaPlayer = MediaPlayer().apply {
+                                                            setDataSource(path)
+                                                            prepare()
+                                                            start()
+                                                            setOnCompletionListener {
+                                                                isPlaying = false
+                                                                playbackProgress = 0f
+                                                                currentSec = "0:00"
+                                                            }
+                                                        }
+                                                        isPlaying = true
+                                                    }
+                                                } catch (e: Exception) {}
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // Waveform Bars matching screenshot
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    val barHeights = listOf(
+                                        8, 12, 16, 10, 14, 18, 12, 16, 20, 14, 18, 12,
+                                        16, 22, 14, 18, 12, 16, 10, 14, 18, 12, 16, 8
+                                    )
+                                    barHeights.forEach { h ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width(2.5.dp)
+                                                .height(h.dp)
+                                                .background(
+                                                    if (isMine) Color(0xFF0F4C81).copy(alpha = 0.75f) else Color(0xFFCBD5E1),
+                                                    RoundedCornerShape(1.dp)
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Timers row: 0:00 on left, 0:12 on right
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 48.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = currentSec,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                                Text(
+                                    text = durationFormatted,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = timeString,
+                                fontSize = 10.5.sp,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
                     }
 
                     MessageType.IMAGE -> {
                         val file = message.filePath?.let { File(it) }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onMediaClick(message) }
-                        ) {
+                        if (file != null && file.exists()) {
                             AsyncImage(
-                                model = file ?: message.filePath,
+                                model = file,
                                 contentDescription = "Photo",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onMediaClick(message) }
                             )
+                        } else {
+                            Text("[Photo]", fontSize = 14.sp, color = textColor)
                         }
-                        if (message.content.isNotBlank() && message.content != message.fileName) {
-                            Text(
-                                text = message.content,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = textColor,
-                                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-                            )
-                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isMine) "$timeString · Read" else timeString,
+                            fontSize = 11.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.align(Alignment.End)
+                        )
                     }
 
                     MessageType.VIDEO -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.Black.copy(alpha = 0.6f))
-                                .clickable { onMediaClick(message) },
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Play Video",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                    .padding(8.dp)
-                            )
+                            Icon(Icons.Default.Videocam, contentDescription = null, tint = Color(0xFF0F4C81))
+                            Text(message.fileName ?: "Video", fontSize = 14.sp, color = textColor)
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = message.fileName ?: "Video message",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = textColor,
-                            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                            text = if (isMine) "$timeString · Read" else timeString,
+                            fontSize = 11.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.align(Alignment.End)
                         )
-                    }
-
-                    MessageType.AUDIO -> {
-                        AudioMessagePlayer(message = message, isMine = isMine)
-                    }
-
-                    MessageType.FILE -> {
-                        FileMessageCard(message = message, isMine = isMine)
                     }
 
                     else -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = Color(0xFF0F4C81))
+                            Text(message.fileName ?: message.content, fontSize = 14.sp, color = textColor)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = message.content,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = textColor
+                            text = if (isMine) "$timeString · Read" else timeString,
+                            fontSize = 11.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.align(Alignment.End)
                         )
                     }
                 }
-
-                // Timestamp & Delivery status
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val timeFormatted = remember(message.timestamp) {
-                        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
-                    }
-                    Text(
-                        text = timeFormatted,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = timeColor
-                    )
-                    if (isMine) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        when (message.status) {
-                            MessageStatus.SENDING -> {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(10.dp),
-                                    strokeWidth = 1.5.dp,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                            }
-                            MessageStatus.SENT -> {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Sent",
-                                    tint = Color.White.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                            MessageStatus.DELIVERED -> {
-                                Icon(
-                                    imageVector = Icons.Default.DoneAll,
-                                    contentDescription = "Delivered",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                            MessageStatus.FAILED -> {
-                                Text("!", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
             }
-        }
-    }
-}
-
-@Composable
-fun AudioMessagePlayer(message: ChatMessage, isMine: Boolean) {
-    val context = LocalContext.current
-    var isPlaying by remember { mutableStateOf(false) }
-    var currentProgress by remember { mutableFloatStateOf(0f) }
-    val mediaPlayer = remember { MediaPlayer() }
-
-    DisposableEffect(message.filePath) {
-        onDispose {
-            try {
-                if (mediaPlayer.isPlaying) mediaPlayer.stop()
-                mediaPlayer.release()
-            } catch (e: Exception) {}
-        }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = if (isMine) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .size(38.dp)
-                .clickable {
-                    val path = message.filePath
-                    if (path != null && File(path).exists()) {
-                        if (isPlaying) {
-                            mediaPlayer.pause()
-                            isPlaying = false
-                        } else {
-                            try {
-                                mediaPlayer.reset()
-                                mediaPlayer.setDataSource(path)
-                                mediaPlayer.prepare()
-                                mediaPlayer.start()
-                                isPlaying = true
-                                mediaPlayer.setOnCompletionListener {
-                                    isPlaying = false
-                                    currentProgress = 0f
-                                }
-                            } catch (e: Exception) {}
-                        }
-                    }
-                }
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Icon(
-                imageVector = Icons.Default.GraphicEq,
-                contentDescription = "Waveform",
-                tint = if (isMine) Color.White else MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp)
-            )
-            Text(
-                text = "Voice Note • ${message.fileName ?: ""}",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isMine) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun FileMessageCard(message: ChatMessage, isMine: Boolean) {
-    val context = LocalContext.current
-    val fileSizeFormatted = remember(message.fileSize) {
-        val kb = message.fileSize / 1024f
-        if (kb > 1024) String.format("%.1f MB", kb / 1024f) else String.format("%.0f KB", kb)
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp)
-            .clickable {
-                message.filePath?.let { path ->
-                    val file = File(path)
-                    if (file.exists()) {
-                        try {
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "*/*")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Open file"))
-                        } catch (e: Exception) {}
-                    }
-                }
-            },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = if (isMine) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-            modifier = Modifier.size(42.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = "File",
-                    tint = if (isMine) Color.White else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = message.fileName ?: "Document",
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-                color = if (isMine) Color.White else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-            Text(
-                text = fileSizeFormatted,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isMine) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

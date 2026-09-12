@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Zero Network Connectivity - Web Client</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons & QR Code Generator -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body class="light-mode-chat">
+  <!-- Top Navigation & Signal Bar -->
+  <header class="top-nav">
+    <div class="brand">
+      <div class="logo-pulse">
+        <span class="pulse-ring"></span>
+        <i data-lucide="radio" class="logo-icon"></i>
+      </div>
+      <div>
+        <h1 class="brand-title">Zero Network <span class="badge-tag">v1.0.3</span></h1>
+        <p class="brand-subtitle">Offline LAN Peer-to-Peer Interop</p>
+      </div>
+    </div>
+
+    <div class="network-stats">
+      <div class="stat-pill">
+        <span class="status-dot online"></span>
+        <span id="localIpLabel">127.0.0.1</span>
+      </div>
+      <div class="stat-pill">
+        <i data-lucide="smartphone" class="mini-icon"></i>
+        <span id="peersCountLabel">0 Phones</span>
+      </div>
+      <button id="btnSubnetScan" class="btn-ghost" title="Rescan Local Wi-Fi Subnet">
+        <i data-lucide="refresh-cw"></i> Scan
+      </button>
+      <button id="btnQrModal" class="btn-primary" title="Connect with QR">
+        <i data-lucide="qr-code"></i> Connect QR
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="app-layout">
+    <!-- Left Navigation Dock -->
+    <nav class="side-dock">
+      <button class="dock-btn active" data-tab="chats" title="Chats">
+        <i data-lucide="message-square"></i>
+        <span>Chats</span>
+      </button>
+      <button class="dock-btn" data-tab="radar" title="Find Others Radar">
+        <i data-lucide="radar"></i>
+        <span>Radar</span>
+      </button>
+      <button class="dock-btn" data-tab="profile" title="Profile & LAN Settings">
+        <i data-lucide="user"></i>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <!-- Master Column: Chats / Peers List -->
+    <aside class="peers-column" id="peersColumn">
+      <div class="search-bar-wrap">
+        <i data-lucide="search" class="search-icon"></i>
+        <input type="text" id="peerSearchInput" placeholder="Search phone or IP..." />
+      </div>
+
+      <div class="filter-chips">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="online">Online</button>
+      </div>
+
+      <div class="peers-list" id="peersList">
+        <div class="empty-state">
+          <i data-lucide="wifi-off" class="empty-icon"></i>
+          <p>Scanning Wi-Fi network for active phones...</p>
+          <small>Make sure your phone is on the same Wi-Fi with Zero Network Connectivity open.</small>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Detail Area: Main Active View -->
+    <main class="main-content">
+      <!-- 1. Chat View (Exact Screenshot Design) -->
+      <section class="content-view active" id="chatView">
+        <div class="chat-placeholder" id="noChatSelected">
+          <div class="radar-mini-pulse">
+            <i data-lucide="radio" class="radar-center-icon"></i>
+          </div>
+          <h2>Select a phone to start messaging</h2>
+          <p>End-to-end local Wi-Fi connectivity. No internet required.</p>
+          <button class="btn-primary" id="btnExploreRadar">
+            <i data-lucide="radar"></i> Open Radar View
+          </button>
+        </div>
+
+        <div class="chat-container" id="activeChatContainer" style="display: none;">
+          <!-- Top Bar matching Screenshot -->
+          <div class="chat-header-screenshot">
+            <div class="chat-header-left">
+              <button class="btn-circular-back" id="btnMobileBack">
+                <i data-lucide="arrow-left"></i>
+              </button>
+              <div class="avatar-pastel" id="chatAvatar">
+                <span>MC</span>
+              </div>
+              <div>
+                <h3 id="chatPeerName">Maya Chen</h3>
+                <p id="chatPeerSubtitle">Contact</p>
+              </div>
+            </div>
+
+            <div class="chat-header-right">
+              <button class="btn-circular-call" id="btnStartAudioCall" title="Voice Call">
+                <i data-lucide="phone"></i>
+              </button>
+              <button class="btn-circular-call" id="btnStartVideoCall" title="Video Call">
+                <i data-lucide="video"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Message History -->
+          <div class="chat-messages-scroll" id="chatMessages">
+            <!-- Top Encryption Banner from Screenshot -->
+            <div class="encryption-banner-card">
+              <i data-lucide="lock" class="encryption-lock-icon"></i>
+              <span>This chat is end-to-end encrypted and stored only on these two devices.</span>
+            </div>
+            <!-- Bubbles injected via JS -->
+          </div>
+
+          <!-- Typing Bar Indicator -->
+          <div class="typing-bar" id="typingIndicator" style="display: none;">
+            <div class="typing-wave">
+              <span></span><span></span><span></span>
+            </div>
+            <span id="typingLabel">Peer is typing...</span>
+          </div>
+
+          <!-- Exact Bottom Input Bar from Screenshot -->
+          <div class="chat-input-bar-screenshot">
+            <button class="btn-circular-attach" id="btnAttach" title="Attach file or photo">
+              <i data-lucide="paperclip"></i>
+            </button>
+            <input type="file" id="hiddenFileInput" style="display: none;" />
+
+            <div class="pill-input-wrap">
+              <input type="text" id="chatInputText" placeholder="Type a message" autocomplete="off" />
+            </div>
+
+            <button class="btn-circular-mic" id="btnVoiceRecord" title="Hold or Click to Record Voice Note">
+              <i data-lucide="mic"></i>
+            </button>
+
+            <button class="btn-circular-send" id="btnSendMessage" style="display: none;" title="Send Message">
+              <i data-lucide="send"></i>
+            </button>
+          </div>
+
+          <!-- Voice Recording Banner Overlay -->
+          <div class="voice-recording-banner" id="voiceRecordingBanner" style="display: none;">
+            <div class="recording-pulse"></div>
+            <span class="recording-timer" id="recordingTimer">00:00</span>
+            <span class="recording-hint">Recording Voice Note... Release or tap Stop to send</span>
+            <button class="btn-danger-sm" id="btnCancelVoice">Cancel</button>
+            <button class="btn-success-sm" id="btnSendVoice">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Radar View -->
+      <section class="content-view" id="radarView">
+        <div class="radar-workspace">
+          <div class="radar-header">
+            <h2>Find Others &bull; Sonar Radar</h2>
+            <p>Live active scanning of Wi-Fi broadcast port 1050</p>
+          </div>
+
+          <div class="radar-screen-wrap">
+            <div class="radar-screen" id="radarScreen">
+              <div class="radar-ring ring-1"></div>
+              <div class="radar-ring ring-2"></div>
+              <div class="radar-ring ring-3"></div>
+              <div class="radar-ring ring-4"></div>
+              <div class="radar-cross-x"></div>
+              <div class="radar-cross-y"></div>
+              <div class="radar-beam"></div>
+              <div class="radar-center-blip">
+                <i data-lucide="laptop" class="center-blip-icon"></i>
+              </div>
+              <div class="blips-container" id="blipsContainer"></div>
+            </div>
+          </div>
+
+          <div class="radar-peers-summary">
+            <h3>Discovered Devices Nearby (<span id="radarCount">0</span>)</h3>
+            <div class="radar-cards-grid" id="radarCardsGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Profile & Download Android App View -->
+      <section class="content-view" id="profileView">
+        <div class="profile-card">
+          <div class="profile-header">
+            <div class="profile-avatar-large" id="myAvatarDisplay">
+              <span>W</span>
+            </div>
+            <div>
+              <h2 id="myProfileNameDisplay">Zero Web Desktop</h2>
+              <p id="myProfileIpDisplay">IP: 127.0.0.1</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>User Name</label>
+            <input type="text" id="inputProfileName" value="Zero Web (Desktop)" />
+          </div>
+
+          <div class="form-group">
+            <label>Avatar Color Theme</label>
+            <div class="color-picker-row">
+              <span class="color-dot active" data-color="#2F80ED" style="background:#2F80ED;"></span>
+              <span class="color-dot" data-color="#10B981" style="background:#10B981;"></span>
+              <span class="color-dot" data-color="#F59E0B" style="background:#F59E0B;"></span>
+              <span class="color-dot" data-color="#8B5CF6" style="background:#8B5CF6;"></span>
+              <span class="color-dot" data-color="#EC4899" style="background:#EC4899;"></span>
+            </div>
+          </div>
+
+          <button class="btn-primary" id="btnSaveProfile">
+            <i data-lucide="save"></i> Save & Broadcast to Wi-Fi
+          </button>
+
+          <!-- Get Android App Card -->
+          <div class="get-app-card">
+            <div class="get-app-left">
+              <div class="android-icon-box">
+                <i data-lucide="smartphone"></i>
+              </div>
+              <div>
+                <h4>Zero Network Connectivity App (v1.0.3)</h4>
+                <p>Download the official Android APK directly from this desktop server</p>
+              </div>
+            </div>
+            <a href="/download-apk" class="btn-download-apk">
+              <i data-lucide="download"></i> Download APK
+            </a>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="lan-info-box">
+            <h3>Local LAN Protocol Interop (v1.0.3)</h3>
+            <ul>
+              <li><strong>Discovery UDP:</strong> Port 1050 (Heartbeat, Rich Signals)</li>
+              <li><strong>File Server TCP:</strong> Port 1051 (Magic 0x5A4E4554)</li>
+              <li><strong>Voice Stream UDP:</strong> Port 1052 (44.1kHz PCM 16-bit)</li>
+              <li><strong>Video Stream UDP:</strong> Port 1053 (JPEG Frames)</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- QR Connect Dialog Modal -->
+  <div class="modal-backdrop" id="qrModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Connect with QR</h3>
+        <button class="btn-close" id="btnCloseQrModal">&times;</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="tab-btn active" id="tabShowQr">Show QR (Phone Scans Me)</button>
+        <button class="tab-btn" id="tabScanQr">Scan QR (Scan Phone's Code)</button>
+      </div>
+
+      <div class="modal-tab-content active" id="panelShowQr">
+        <p class="qr-hint">Scan this QR code from your phone's Zero Network Connectivity app:</p>
+        <div class="qr-canvas-wrap" id="qrcodeCanvas"></div>
+        <p class="qr-payload-text" id="qrPayloadText"></p>
+      </div>
+
+      <div class="modal-tab-content" id="panelScanQr" style="display: none;">
+        <p class="qr-hint">Hold the phone's QR code up to your desktop webcam:</p>
+        <div class="video-scan-wrap">
+          <video id="webcamScanVideo" autoplay playsinline muted></video>
+          <canvas id="webcamScanCanvas" style="display: none;"></canvas>
+          <div class="scan-crosshair"></div>
+        </div>
+        <p id="qrScanStatus">Waiting for camera feed...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incoming Call Modal -->
+  <div class="modal-backdrop call-modal" id="incomingCallModal" style="display: none;">
+    <div class="call-card">
+      <div class="call-avatar-pulse">
+        <span id="callCallerAvatar">P</span>
+      </div>
+      <h3 id="callCallerName">Incoming Call</h3>
+      <p id="callCallerIp">192.168.1.105</p>
+      <p class="call-type-badge" id="callTypeBadge">Voice Call</p>
+
+      <div class="call-actions-row">
+        <button class="btn-call-decline" id="btnDeclineCall">
+          <i data-lucide="phone-off"></i> Decline
+        </button>
+        <button class="btn-call-accept" id="btnAcceptCall">
+          <i data-lucide="phone"></i> Accept
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Call Screen Overlay -->
+  <div class="active-call-overlay" id="activeCallOverlay" style="display: none;">
+    <div class="call-top-bar">
+      <div class="call-peer-badge">
+        <span class="status-dot active-call"></span>
+        <span id="activeCallPeerName">In Call with Android Phone</span>
+      </div>
+      <div class="call-timer-badge" id="activeCallTimer">00:00</div>
+    </div>
+
+    <div class="call-media-viewport">
+      <canvas id="remoteVideoCanvas" class="remote-video-canvas"></canvas>
+      <div class="local-pip-wrap" id="localPipWrap">
+        <video id="localWebcamVideo" autoplay playsinline muted class="local-webcam-preview"></video>
+      </div>
+      <div class="voice-call-display" id="voiceCallDisplay">
+        <div class="voice-avatar-large">
+          <i data-lucide="mic" class="voice-icon-center"></i>
+        </div>
+        <div class="sound-wave-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="call-controls-bar">
+      <button class="btn-call-ctrl" id="btnToggleMic" title="Mute/Unmute Mic">
+        <i data-lucide="mic"></i>
+      </button>
+      <button class="btn-call-ctrl" id="btnToggleCam" title="Toggle Camera">
+        <i data-lucide="video"></i>
+      </button>
+      <button class="btn-call-hangup" id="btnHangupCall" title="End Call">
+        <i data-lucide="phone-off"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Fullscreen Image Lightbox -->
+  <div class="lightbox-backdrop" id="imageLightbox" style="display: none;">
+    <button class="lightbox-close" id="btnCloseLightbox">&times;</button>
+    <img id="lightboxImg" src="" alt="Fullscreen preview" />
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -535,45 +535,161 @@ fun ConnectionsView(viewModel: SettingsViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Status & Refresh Header
+        // Realtime Wi-Fi Signal Monitor Card
         item {
+            val rssi = stats.rssi
+            val signalPercent = ((rssi + 100).coerceIn(0, 70) / 70f * 100).toInt()
+            val signalColor = when {
+                rssi >= -60 -> Color(0xFF10B981) // Green
+                rssi >= -70 -> Color(0xFF3B82F6) // Blue
+                rssi >= -82 -> Color(0xFFF59E0B) // Amber
+                else -> Color(0xFFEF4444) // Red
+            }
+
             Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (stats.isConnectedToWifi) "Active LAN Connected" else "LAN Disconnected",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "SSID: ${stats.ssid}",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(if (stats.isConnectedToWifi) signalColor else Color.Gray, CircleShape)
+                                )
+                                Text(
+                                    text = "Realtime Wi-Fi Monitor",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stats.ssid,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.refreshNetworkDiagnostics() },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh Diagnostics",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
 
-                    IconButton(
-                        onClick = { viewModel.refreshNetworkDiagnostics() },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Live Signal Bar Meter
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Diagnostics",
-                            tint = Color.White
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "$rssi dBm",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = signalColor
+                                )
+                                Text(
+                                    text = "${stats.signalStrength} ($signalPercent%)",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // 4 Physical Signal Strength Bars
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                verticalAlignment = Alignment.Bottom,
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                val barsActive = when {
+                                    rssi >= -60 -> 4
+                                    rssi >= -70 -> 3
+                                    rssi >= -82 -> 2
+                                    rssi >= -92 -> 1
+                                    else -> 0
+                                }
+                                listOf(8, 14, 20, 28).forEachIndexed { idx, h ->
+                                    Box(
+                                        modifier = Modifier
+                                            .width(8.dp)
+                                            .height(h.dp)
+                                            .background(
+                                                if (idx < barsActive) signalColor else Color.Gray.copy(alpha = 0.25f),
+                                                RoundedCornerShape(2.dp)
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Quick Stats Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("Link Speed", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${stats.linkSpeedMbps} Mbps", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("Frequency", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (stats.frequencyMhz > 0) "${stats.frequencyMhz} MHz" else "2.4 GHz", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("Gateway IP", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stats.gateway, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }

@@ -24,8 +24,10 @@ import com.zeronetwork.connectivity.ui.screens.call.VideoCallScreen
 import com.zeronetwork.connectivity.ui.screens.call.VoiceCallScreen
 import com.zeronetwork.connectivity.ui.screens.chat.ChatDetailScreen
 import com.zeronetwork.connectivity.ui.screens.main.MainScreen
+import com.zeronetwork.connectivity.ui.screens.onboarding.UsernameSetupDialog
 import com.zeronetwork.connectivity.ui.screens.permissions.PermissionRequestScreen
 import com.zeronetwork.connectivity.ui.screens.settings.SettingsScreen
+import com.zeronetwork.connectivity.ui.screens.splash.SplashScreen
 import com.zeronetwork.connectivity.ui.screens.updates.AppUpdateScreen
 import com.zeronetwork.connectivity.ui.theme.ZeroNetworkTheme
 import com.zeronetwork.connectivity.ui.viewmodel.CallViewModel
@@ -34,6 +36,7 @@ import com.zeronetwork.connectivity.ui.viewmodel.MainViewModel
 import com.zeronetwork.connectivity.ui.viewmodel.SettingsViewModel
 
 sealed interface AppNavScreen {
+    data object Splash : AppNavScreen
     data object Permissions : AppNavScreen
     data object Main : AppNavScreen
     data class ChatDetail(val conversationId: String, val title: String, val isGroup: Boolean) : AppNavScreen
@@ -59,10 +62,20 @@ class MainActivity : ComponentActivity() {
             val activeCallSession by callViewModel.callSession.collectAsState()
 
             var currentScreen by remember {
-                mutableStateOf<AppNavScreen>(if (isFirstLaunch) AppNavScreen.Permissions else AppNavScreen.Main)
+                mutableStateOf<AppNavScreen>(AppNavScreen.Splash)
             }
 
             ZeroNetworkTheme(fontKey = userProfile.fontStyleKey) {
+                // If username is blank after splash, show compulsory setup
+                if (currentScreen != AppNavScreen.Splash && userProfile.username.isBlank()) {
+                    UsernameSetupDialog(
+                        initialUsername = "",
+                        onUsernameConfirmed = { confirmedName ->
+                            settingsViewModel.updateUsername(confirmedName)
+                        }
+                    )
+                }
+
                 val currentCall = activeCallSession
                 if (currentCall != null) {
                     if (currentCall.isVideo) {
@@ -86,6 +99,14 @@ class MainActivity : ComponentActivity() {
                         label = "app_navigation"
                     ) { screen ->
                         when (screen) {
+                            is AppNavScreen.Splash -> {
+                                SplashScreen(
+                                    onSplashFinished = {
+                                        currentScreen = if (isFirstLaunch) AppNavScreen.Permissions else AppNavScreen.Main
+                                    }
+                                )
+                            }
+
                             is AppNavScreen.Permissions -> {
                                 PermissionRequestScreen(
                                     onPermissionsGranted = {
@@ -120,8 +141,9 @@ class MainActivity : ComponentActivity() {
                                     conversationId = screen.conversationId,
                                     peerTitle = screen.title,
                                     isGroup = screen.isGroup,
-                                    viewModel = chatViewModel,
-                                    onBack = { currentScreen = AppNavScreen.Main },
+                                    onBack = {
+                                        currentScreen = AppNavScreen.Main
+                                    },
                                     onStartVoiceCall = { ip, title ->
                                         callViewModel.startCall(ip, title, false)
                                     },
@@ -133,15 +155,19 @@ class MainActivity : ComponentActivity() {
 
                             is AppNavScreen.Settings -> {
                                 SettingsScreen(
-                                    viewModel = settingsViewModel,
-                                    onNavigateBack = { currentScreen = AppNavScreen.Main }
+                                    onNavigateBack = {
+                                        currentScreen = AppNavScreen.Main
+                                    },
+                                    viewModel = settingsViewModel
                                 )
                             }
 
                             is AppNavScreen.AppUpdates -> {
                                 AppUpdateScreen(
                                     updateManager = ZeroNetworkApp.instance.updateManager,
-                                    onNavigateBack = { currentScreen = AppNavScreen.Main }
+                                    onNavigateBack = {
+                                        currentScreen = AppNavScreen.Main
+                                    }
                                 )
                             }
                         }

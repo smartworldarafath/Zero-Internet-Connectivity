@@ -13,6 +13,7 @@ import com.zeronetwork.connectivity.data.model.ChatConversation
 import com.zeronetwork.connectivity.data.model.ChatMessage
 import com.zeronetwork.connectivity.data.model.MessageStatus
 import com.zeronetwork.connectivity.data.model.MessageType
+import com.zeronetwork.connectivity.data.model.Peer
 import com.zeronetwork.connectivity.network.FileTransferEvent
 import com.zeronetwork.connectivity.network.LanDiscoveryService
 import com.zeronetwork.connectivity.network.LanEvent
@@ -83,6 +84,28 @@ class ChatRepository(
         scope.launch {
             discoveryService.events.collect { event ->
                 when (event) {
+                    is LanEvent.QrConnectHandshake -> {
+                        val senderName = if (event.senderName.isNotBlank()) event.senderName else event.senderIp
+                        val existingPeer = peerDao.getPeerByIp(event.senderIp)
+                        val colorIdx = existingPeer?.avatarColorIndex ?: (event.senderIp.hashCode().mod(6).let { if (it < 0) -it else it })
+                        peerDao.insertPeer(
+                            Peer(
+                                ipAddress = event.senderIp,
+                                username = senderName,
+                                avatarColorIndex = colorIdx,
+                                avatarBase64 = event.avatarBase64 ?: existingPeer?.avatarBase64,
+                                lastSeen = System.currentTimeMillis(),
+                                isOnline = true
+                            )
+                        )
+                        updateConversationSnippet(
+                            conversationId = event.senderIp,
+                            title = senderName,
+                            lastSnippet = "Connected via QR",
+                            type = MessageType.SYSTEM,
+                            incrementUnread = false
+                        )
+                    }
                     is LanEvent.TextMessage -> {
                         val senderPeer = peerDao.getPeerByIp(event.senderIp)
                         val senderName = senderPeer?.username ?: event.senderIp
