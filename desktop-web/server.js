@@ -8,6 +8,13 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught Exception:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] Unhandled Rejection:', reason);
+});
+
 const HTTP_PORT = 5000;
 const DISCOVERY_PORT = 1050;
 const TCP_FILE_PORT = 1051;
@@ -70,6 +77,7 @@ const peers = new Map(); // ip -> { ip, username, lastSeen, avatarBase64, isOnli
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
+wss.on('error', (err) => console.error('[WebSocket Server] Error:', err.message));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -214,6 +222,9 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // 1. UDP Discovery & Heartbeat (Port 1050)
 // -------------------------------------------------------------
 const discoverySocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+discoverySocket.on('error', (err) => {
+  console.error('[Discovery] UDP Socket error:', err.message);
+});
 
 discoverySocket.on('listening', () => {
   discoverySocket.setBroadcast(true);
@@ -533,6 +544,10 @@ const tcpFileServer = net.createServer((socket) => {
   });
 });
 
+tcpFileServer.on('error', (err) => {
+  console.error('[File Server] TCP Server error:', err.message);
+});
+
 tcpFileServer.listen(TCP_FILE_PORT, '0.0.0.0', () => {
   console.log(`[File Server] TCP listening on 0.0.0.0:${TCP_FILE_PORT}`);
 });
@@ -543,6 +558,9 @@ tcpFileServer.listen(TCP_FILE_PORT, '0.0.0.0', () => {
 let activeCallTargetIp = null;
 
 const audioSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+audioSocket.on('error', (err) => {
+  console.error('[Voice Call] UDP Audio error:', err.message);
+});
 audioSocket.on('listening', () => {
   console.log(`[Voice Call] UDP Audio listening on 0.0.0.0:${VOICE_CALL_PORT}`);
 });
@@ -563,6 +581,9 @@ try {
 }
 
 const videoSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+videoSocket.on('error', (err) => {
+  console.error('[Video Call] UDP Video error:', err.message);
+});
 videoSocket.on('listening', () => {
   console.log(`[Video Call] UDP Video listening on 0.0.0.0:${VIDEO_CALL_PORT}`);
 });
@@ -587,6 +608,9 @@ try {
 // -------------------------------------------------------------
 wss.on('connection', (ws) => {
   console.log('[WebSocket] Desktop Web Client connected');
+  ws.on('error', (err) => {
+    console.error('[WebSocket] Client connection error:', err.message);
+  });
   // Immediately send initial peers and network info
   sendPeersUpdate();
   triggerSubnetScan();
